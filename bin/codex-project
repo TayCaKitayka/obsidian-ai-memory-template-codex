@@ -1,0 +1,126 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+SCRIPT_PATH="${0:A}"
+SCRIPT_DIR="${SCRIPT_PATH:h}"
+
+if [[ -n "${CODEX_MEMORY_TEMPLATE_ROOT:-}" ]]; then
+  TEMPLATE_ROOT="$CODEX_MEMORY_TEMPLATE_ROOT"
+elif [[ -d "$SCRIPT_DIR/../templates/AI Memory" ]]; then
+  TEMPLATE_ROOT="${SCRIPT_DIR:h}"
+elif [[ -d "$HOME/Desktop/ObsidianVault/ai-memory-public/templates/AI Memory" ]]; then
+  TEMPLATE_ROOT="$HOME/Desktop/ObsidianVault/ai-memory-public"
+else
+  TEMPLATE_ROOT=""
+fi
+
+TARGET_ROOT="$PWD"
+TODAY="$(date +%F)"
+
+usage() {
+  cat <<'USAGE'
+Usage: codex-project [--init-only] [--no-start] [--help] [-- <codex args...>]
+
+Initializes the current directory with public Obsidian AI Memory templates
+when they are missing, then starts Codex with this directory as workspace.
+
+Options:
+  --init-only   Initialize memory files and exit without starting Codex.
+  --no-start    Same as --init-only.
+  --help        Show this help.
+
+Environment:
+  CODEX_MEMORY_TEMPLATE_ROOT  Override template root.
+USAGE
+}
+
+init_only=0
+codex_args=()
+
+while (($#)); do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --init-only|--no-start)
+      init_only=1
+      shift
+      ;;
+    --)
+      shift
+      codex_args+=("$@")
+      break
+      ;;
+    *)
+      codex_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$TEMPLATE_ROOT" ]]; then
+  print -u2 "codex-project: template root not found."
+  print -u2 "Run from a cloned ai-memory-public repo, install via ./install.sh, or set CODEX_MEMORY_TEMPLATE_ROOT."
+  exit 1
+fi
+
+TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
+TEMPLATE_AGENTS="$TEMPLATE_ROOT/AGENTS.md"
+
+if [[ ! -d "$TEMPLATE_MEMORY" ]]; then
+  print -u2 "codex-project: template directory not found: $TEMPLATE_MEMORY"
+  exit 1
+fi
+
+if [[ ! -f "$TEMPLATE_AGENTS" ]]; then
+  print -u2 "codex-project: template AGENTS.md not found: $TEMPLATE_AGENTS"
+  exit 1
+fi
+
+created=()
+skipped=()
+
+if [[ -e "$TARGET_ROOT/AGENTS.md" ]]; then
+  skipped+=("AGENTS.md")
+else
+  cp "$TEMPLATE_AGENTS" "$TARGET_ROOT/AGENTS.md"
+  created+=("AGENTS.md")
+fi
+
+mkdir -p "$TARGET_ROOT/AI Memory"
+
+for src in "$TEMPLATE_MEMORY"/*.md(N); do
+  name="${src:t}"
+  dest="$TARGET_ROOT/AI Memory/$name"
+  if [[ -e "$dest" ]]; then
+    skipped+=("AI Memory/$name")
+    continue
+  fi
+
+  cp "$src" "$dest"
+  perl -pi -e "s/YYYY-MM-DD/$TODAY/g" "$dest"
+  created+=("AI Memory/$name")
+done
+
+if (( ${#created[@]} )); then
+  print "codex-project: created:"
+  for item in "${created[@]}"; do
+    print "  + $item"
+  done
+else
+  print "codex-project: memory structure already exists."
+fi
+
+if (( ${#skipped[@]} )); then
+  print "codex-project: skipped existing files:"
+  for item in "${skipped[@]}"; do
+    print "  = $item"
+  done
+fi
+
+if (( init_only )); then
+  exit 0
+fi
+
+exec codex -C "$TARGET_ROOT" "${codex_args[@]}"
