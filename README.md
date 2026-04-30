@@ -8,6 +8,7 @@ It creates project-local memory files that an agent can read through `AGENTS.md`
 
 - `AGENTS.md` - instructions for agent memory lookup and smart save.
 - `templates/AI Memory/` - empty personal and project memory templates.
+- `locales/ru/` - Russian agent instructions and memory templates.
 - `bin/codex-project` - helper command that initializes memory in the current project and starts Codex.
 - `install.sh` - local installer that symlinks `codex-project` into `~/.local/bin`.
 
@@ -54,6 +55,28 @@ To initialize without starting Codex:
 codex-project --init-only
 ```
 
+## Localization
+
+English is the default:
+
+```bash
+codex-project --lang en
+```
+
+Russian templates are available:
+
+```bash
+codex-project --lang ru
+```
+
+You can also set a default language:
+
+```bash
+export CODEX_MEMORY_LANG=ru
+```
+
+Both localizations understand English and Russian memory commands.
+
 ## Memory Workflow
 
 Normal questions should use lookup mode:
@@ -66,16 +89,36 @@ Normal questions should use lookup mode:
 Saving explicit facts:
 
 ```text
+Save to Obsidian: project run command is npm run dev.
+```
+
+or:
+
+```text
 Сохрани в Obsidian: команда запуска проекта - npm run dev.
 ```
 
 Smart session save:
 
 ```text
+Save
+```
+
+or:
+
+```text
 Сохрани
 ```
 
-The agent should propose what to save, check duplicates and conflicts, then write only after confirmation:
+The agent should propose what to save, check duplicates and conflicts, then write only after confirmation.
+
+English confirmation:
+
+```text
+Yes, save
+```
+
+Russian confirmation:
 
 ```text
 Да, запиши

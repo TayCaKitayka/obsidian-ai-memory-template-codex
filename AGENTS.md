@@ -22,7 +22,24 @@ Do not commit changes unless the user explicitly asks for a git commit.
 
 After substantial coding or project work, propose updates to project memory when the session produced durable commands, decisions, conventions, known issues, or architecture context.
 
-When the user says a short save command such as `Сохрани`, `Сохрани важное`, `Сохрани итог`, or `Сохрани память проекта`, run smart session save.
+## Memory Lookup Commands
+
+Normal questions automatically use lookup mode.
+
+The user may also explicitly ask:
+
+- `Read memory`
+- `Use memory`
+- `What do you remember?`
+- `Прочитай память`
+- `Используй память`
+- `Что ты помнишь?`
+
+If the user says `do not use memory` or `не используй память`, skip memory lookup for that answer.
+
+## Smart Save
+
+When the user says a short save command such as `Save`, `Save important`, `Save summary`, `Save project memory`, `Сохрани`, `Сохрани важное`, `Сохрани итог`, or `Сохрани память проекта`, run smart session save.
 
 Smart session save means:
 
@@ -34,10 +51,12 @@ Smart session save means:
 6. Read each selected target file.
 7. Check duplicates and conflicts.
 8. Show a save plan before writing.
-9. Write only after the user confirms with `Да, запиши`, `Подтверждаю`, `Запиши`, or `OK`.
+9. Write only after the user confirms with `Yes, save`, `Confirm`, `Write it`, `Да, запиши`, `Подтверждаю`, `Запиши`, or `OK`.
 10. Append a log entry to `AI Memory/_log.md` after confirmed writes.
 
-When saving memory:
+## Explicit Save
+
+When saving memory from explicit save commands such as `Save to Obsidian: ...`, `Remember this in Obsidian: ...`, `Add this to memory: ...`, `Save this: ...`, `Update memory: ...`, `Write this to memory: ...`, `Сохрани в Obsidian: ...`, `Запомни это в Obsidian: ...`, `Добавь это в память: ...`, `Сохрани это: ...`, `Обнови память: ...`, or `Запиши это в память: ...`:
 
 1. Extract only explicit user-provided facts.
 2. Read `AI Memory/_index.md`.

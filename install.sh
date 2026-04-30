@@ -10,6 +10,8 @@ ln -sf "$REPO_ROOT/bin/codex-project" "$TARGET"
 chmod +x "$REPO_ROOT/bin/codex-project"
 
 print "Installed codex-project -> $TARGET"
+print "Use English templates: codex-project"
+print "Use Russian templates: codex-project --lang ru"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;

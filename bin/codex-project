@@ -19,22 +19,25 @@ TODAY="$(date +%F)"
 
 usage() {
   cat <<'USAGE'
-Usage: codex-project [--init-only] [--no-start] [--help] [-- <codex args...>]
+Usage: codex-project [--lang en|ru] [--init-only] [--no-start] [--help] [-- <codex args...>]
 
 Initializes the current directory with public Obsidian AI Memory templates
 when they are missing, then starts Codex with this directory as workspace.
 
 Options:
+  --lang en|ru  Choose template language. Default: en.
   --init-only   Initialize memory files and exit without starting Codex.
   --no-start    Same as --init-only.
   --help        Show this help.
 
 Environment:
   CODEX_MEMORY_TEMPLATE_ROOT  Override template root.
+  CODEX_MEMORY_LANG           Default template language: en or ru.
 USAGE
 }
 
 init_only=0
+lang="${CODEX_MEMORY_LANG:-en}"
 codex_args=()
 
 while (($#)); do
@@ -45,6 +48,18 @@ while (($#)); do
       ;;
     --init-only|--no-start)
       init_only=1
+      shift
+      ;;
+    --lang)
+      if (($# < 2)); then
+        print -u2 "codex-project: --lang requires en or ru"
+        exit 1
+      fi
+      lang="$2"
+      shift 2
+      ;;
+    --lang=*)
+      lang="${1#--lang=}"
       shift
       ;;
     --)
@@ -59,14 +74,28 @@ while (($#)); do
   esac
 done
 
+case "$lang" in
+  en|ru) ;;
+  *)
+    print -u2 "codex-project: unsupported language: $lang"
+    print -u2 "Supported languages: en, ru"
+    exit 1
+    ;;
+esac
+
 if [[ -z "$TEMPLATE_ROOT" ]]; then
   print -u2 "codex-project: template root not found."
   print -u2 "Run from a cloned ai-memory-public repo, install via ./install.sh, or set CODEX_MEMORY_TEMPLATE_ROOT."
   exit 1
 fi
 
-TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
-TEMPLATE_AGENTS="$TEMPLATE_ROOT/AGENTS.md"
+if [[ "$lang" == "ru" ]]; then
+  TEMPLATE_MEMORY="$TEMPLATE_ROOT/locales/ru/templates/AI Memory"
+  TEMPLATE_AGENTS="$TEMPLATE_ROOT/locales/ru/AGENTS.md"
+else
+  TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
+  TEMPLATE_AGENTS="$TEMPLATE_ROOT/AGENTS.md"
+fi
 
 if [[ ! -d "$TEMPLATE_MEMORY" ]]; then
   print -u2 "codex-project: template directory not found: $TEMPLATE_MEMORY"
