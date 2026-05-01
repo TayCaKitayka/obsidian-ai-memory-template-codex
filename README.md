@@ -55,6 +55,42 @@ To initialize without starting Codex:
 codex-project --init-only
 ```
 
+## Cloud / Synced Memory
+
+By default, every project gets its own local `AI Memory/` directory.
+
+To keep project memory in a shared cloud folder, pass `--cloud-root`:
+
+```bash
+codex-project --cloud-root "$HOME/Library/Mobile Documents/com~apple~CloudDocs/AI Memory Projects"
+```
+
+The command will create:
+
+```text
+<cloud-root>/<project-name>/AI Memory/
+```
+
+and link it into the current project:
+
+```text
+your-project/AI Memory -> <cloud-root>/<project-name>/AI Memory
+```
+
+You can set a default cloud root:
+
+```bash
+export CODEX_MEMORY_CLOUD_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/AI Memory Projects"
+```
+
+If the current project already has a regular `AI Memory/` directory, `codex-project` will not replace it automatically. It will make a non-destructive first copy into the cloud folder with `rsync --ignore-existing`, then warn you. For ongoing cross-device sync, move or rename the existing local directory first, then rerun with `--cloud-root` so the project can use a symlink.
+
+To use a custom cloud folder name:
+
+```bash
+codex-project --cloud-root "$HOME/Cloud/AI Memory Projects" --project-name mobile_app
+```
+
 ## Localization
 
 English is the default:

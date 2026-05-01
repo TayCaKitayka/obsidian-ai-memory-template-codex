@@ -19,25 +19,31 @@ TODAY="$(date +%F)"
 
 usage() {
   cat <<'USAGE'
-Usage: codex-project [--lang en|ru] [--init-only] [--no-start] [--help] [-- <codex args...>]
+Usage: codex-project [--lang en|ru] [--cloud-root DIR] [--project-name NAME] [--init-only] [--no-start] [--help] [-- <codex args...>]
 
 Initializes the current directory with public Obsidian AI Memory templates
 when they are missing, then starts Codex with this directory as workspace.
 
 Options:
-  --lang en|ru  Choose template language. Default: en.
-  --init-only   Initialize memory files and exit without starting Codex.
-  --no-start    Same as --init-only.
-  --help        Show this help.
+  --lang en|ru       Choose template language. Default: en.
+  --cloud-root DIR   Store AI Memory in DIR/PROJECT/AI Memory and link it into the project.
+  --project-name NAME
+                     Override the cloud folder name. Default: current directory name.
+  --init-only        Initialize memory files and exit without starting Codex.
+  --no-start         Same as --init-only.
+  --help             Show this help.
 
 Environment:
   CODEX_MEMORY_TEMPLATE_ROOT  Override template root.
   CODEX_MEMORY_LANG           Default template language: en or ru.
+  CODEX_MEMORY_CLOUD_ROOT     Default cloud root for shared project memory.
 USAGE
 }
 
 init_only=0
 lang="${CODEX_MEMORY_LANG:-en}"
+cloud_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
+project_name="${CODEX_MEMORY_PROJECT_NAME:-${TARGET_ROOT:t}}"
 codex_args=()
 
 while (($#)); do
@@ -60,6 +66,30 @@ while (($#)); do
       ;;
     --lang=*)
       lang="${1#--lang=}"
+      shift
+      ;;
+    --cloud-root)
+      if (($# < 2)); then
+        print -u2 "codex-project: --cloud-root requires a directory"
+        exit 1
+      fi
+      cloud_root="$2"
+      shift 2
+      ;;
+    --cloud-root=*)
+      cloud_root="${1#--cloud-root=}"
+      shift
+      ;;
+    --project-name)
+      if (($# < 2)); then
+        print -u2 "codex-project: --project-name requires a name"
+        exit 1
+      fi
+      project_name="$2"
+      shift 2
+      ;;
+    --project-name=*)
+      project_name="${1#--project-name=}"
       shift
       ;;
     --)
@@ -109,6 +139,9 @@ fi
 
 created=()
 skipped=()
+warnings=()
+cloud_memory=""
+mirror_to_cloud=0
 
 if [[ -e "$TARGET_ROOT/AGENTS.md" ]]; then
   skipped+=("AGENTS.md")
@@ -117,11 +150,38 @@ else
   created+=("AGENTS.md")
 fi
 
-mkdir -p "$TARGET_ROOT/AI Memory"
+MEMORY_DIR="$TARGET_ROOT/AI Memory"
+
+if [[ -n "$cloud_root" ]]; then
+  cloud_root="${cloud_root:A}"
+  cloud_memory="$cloud_root/$project_name/AI Memory"
+  mkdir -p "$cloud_memory"
+
+  if [[ -L "$MEMORY_DIR" ]]; then
+    current_target="$(readlink "$MEMORY_DIR")"
+    skipped+=("AI Memory symlink -> $current_target")
+  elif [[ -e "$MEMORY_DIR" ]]; then
+    warnings+=("AI Memory already exists as a regular file or directory; not replacing it with a cloud symlink.")
+    warnings+=("A non-destructive copy will be mirrored to: $cloud_memory")
+    warnings+=("For ongoing cross-device sync, move or rename the local AI Memory directory, then rerun codex-project --cloud-root to link it.")
+    mirror_to_cloud=1
+  else
+    ln -s "$cloud_memory" "$MEMORY_DIR"
+    created+=("AI Memory -> $cloud_memory")
+  fi
+
+  if [[ -L "$MEMORY_DIR" ]]; then
+    MEMORY_DIR="$cloud_memory"
+  elif [[ ! -e "$MEMORY_DIR" ]]; then
+    MEMORY_DIR="$cloud_memory"
+  fi
+fi
+
+mkdir -p "$MEMORY_DIR"
 
 for src in "$TEMPLATE_MEMORY"/*.md(N); do
   name="${src:t}"
-  dest="$TARGET_ROOT/AI Memory/$name"
+  dest="$MEMORY_DIR/$name"
   if [[ -e "$dest" ]]; then
     skipped+=("AI Memory/$name")
     continue
@@ -131,6 +191,11 @@ for src in "$TEMPLATE_MEMORY"/*.md(N); do
   perl -pi -e "s/YYYY-MM-DD/$TODAY/g" "$dest"
   created+=("AI Memory/$name")
 done
+
+if (( mirror_to_cloud )); then
+  rsync -a --ignore-existing "$MEMORY_DIR/" "$cloud_memory/"
+  created+=("cloud mirror -> $cloud_memory")
+fi
 
 if (( ${#created[@]} )); then
   print "codex-project: created:"
@@ -145,6 +210,13 @@ if (( ${#skipped[@]} )); then
   print "codex-project: skipped existing files:"
   for item in "${skipped[@]}"; do
     print "  = $item"
+  done
+fi
+
+if (( ${#warnings[@]} )); then
+  print "codex-project: warnings:"
+  for item in "${warnings[@]}"; do
+    print "  ! $item"
   done
 fi
 
