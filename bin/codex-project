@@ -19,7 +19,7 @@ TODAY="$(date +%F)"
 
 usage() {
   cat <<'USAGE'
-Usage: codex-project [--lang en|ru] [--cloud-root DIR] [--project-name NAME] [--init-only] [--no-start] [--help] [-- <codex args...>]
+Usage: codex-project [--lang en|ru] [--cloud-root DIR] [--project-name NAME] [--auto-write-memory] [--init-only] [--no-start] [--help] [-- <codex args...>]
 
 Initializes the current directory with public Obsidian AI Memory templates
 when they are missing, then starts Codex with this directory as workspace.
@@ -29,6 +29,9 @@ Options:
   --cloud-root DIR   Store AI Memory in DIR/PROJECT/AI Memory and link it into the project.
   --project-name NAME
                      Override the cloud folder name. Default: current directory name.
+  --auto-write-memory
+                     Allow the agent to update AI Memory without asking for per-write confirmation.
+                     This is unsafe and requires an interactive warning confirmation.
   --init-only        Initialize memory files and exit without starting Codex.
   --no-start         Same as --init-only.
   --help             Show this help.
@@ -44,6 +47,7 @@ init_only=0
 lang="${CODEX_MEMORY_LANG:-en}"
 cloud_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
 project_name="${CODEX_MEMORY_PROJECT_NAME:-${TARGET_ROOT:t}}"
+auto_write_memory=0
 codex_args=()
 
 while (($#)); do
@@ -90,6 +94,10 @@ while (($#)); do
       ;;
     --project-name=*)
       project_name="${1#--project-name=}"
+      shift
+      ;;
+    --auto-write-memory)
+      auto_write_memory=1
       shift
       ;;
     --)
@@ -143,11 +151,129 @@ warnings=()
 cloud_memory=""
 mirror_to_cloud=0
 
+confirm_auto_write_memory() {
+  local required="ENABLE AUTO MEMORY WRITE"
+  local answer=""
+
+  if command -v osascript >/dev/null 2>&1; then
+    osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
+display dialog "Auto-write memory mode lets the agent modify AI Memory files without asking before each write. Use it only in trusted projects. Secrets must never be stored." buttons {"Cancel", "Continue"} default button "Cancel" with icon caution
+APPLESCRIPT
+  fi
+
+  print ""
+  print "WARNING: --auto-write-memory enables autonomous writes to AI Memory."
+  print "The agent may update memory files without per-write confirmation."
+  print "Risks: noisy memory, wrong durable facts, accidental persistence of sensitive context."
+  print "Safeguards remain: no secrets, append-only preference, duplicate/conflict checks, log updates, no git commits."
+  print ""
+  print "Type exactly '$required' to enable it for this project:"
+
+  if ! read -r answer; then
+    print -u2 "codex-project: auto-write-memory confirmation failed."
+    exit 1
+  fi
+
+  if [[ "$answer" != "$required" ]]; then
+    print -u2 "codex-project: auto-write-memory was not enabled."
+    exit 1
+  fi
+}
+
+append_auto_write_rules() {
+  local agents_file="$1"
+  local mode_lang="$2"
+
+  if rg -q '^## Autonomous Memory Write Mode$|^## Автономная запись в память$' "$agents_file" 2>/dev/null; then
+    skipped+=("AGENTS.md autonomous memory write rules")
+    return
+  fi
+
+  if [[ "$mode_lang" == "ru" ]]; then
+    cat >> "$agents_file" <<'RULES'
+
+## Автономная запись в память
+
+Этот проект запущен с включённым `--auto-write-memory`.
+
+Агент может обновлять файлы `AI Memory/` без отдельного подтверждения перед каждой записью, если обнаружил устойчивую информацию, полезную для будущих AI coding sessions.
+
+Разрешено автоматически сохранять:
+
+- проверенные команды запуска, тестов, сборки, линтинга и диагностики
+- архитектурные решения и связи компонентов
+- настройки окружения разработки и setup steps
+- conventions проекта и правила именования
+- известные проблемы, ограничения, workaround и риски
+- устойчивые задачи, roadmap items и follow-ups
+- краткие итоги существенных coding sessions
+
+Перед записью всё равно нужно:
+
+1. Прочитать `AI Memory/_index.md`.
+2. Выбрать целевой memory-файл.
+3. Прочитать целевой файл.
+4. Проверить дубли по смыслу.
+5. Проверить конфликты с активными фактами.
+6. Предпочитать append-only изменения.
+7. Добавить запись в `AI Memory/_log.md`.
+
+Нельзя автоматически сохранять секреты, токены, пароли, private keys, credentials, private URLs, лишние персональные данные, догадки, временный вывод терминала, одноразовые ошибки или низкоценный шум.
+
+Если есть конфликт, риск секрета, сомнение в устойчивости факта или запись требует изменения файлов вне `AI Memory/`, нужно сначала спросить пользователя.
+
+Git commit и push всё равно запрещены без явной команды пользователя.
+RULES
+  else
+    cat >> "$agents_file" <<'RULES'
+
+## Autonomous Memory Write Mode
+
+This project was initialized with `--auto-write-memory`.
+
+The agent may update `AI Memory/` files without asking for per-write confirmation when it finds durable information useful for future AI coding sessions.
+
+The agent may automatically save:
+
+- verified run, test, build, lint, and diagnostic commands
+- architecture decisions and component relationships
+- development environment settings and setup steps
+- project conventions and naming rules
+- known issues, limitations, workarounds, and risks
+- durable tasks, roadmap items, and follow-ups
+- concise summaries of substantial coding sessions
+
+Before writing, the agent must still:
+
+1. Read `AI Memory/_index.md`.
+2. Choose the target memory file.
+3. Read the target file.
+4. Check duplicates by meaning.
+5. Check conflicts against active facts.
+6. Prefer append-only edits.
+7. Append a log entry to `AI Memory/_log.md`.
+
+Never automatically save secrets, tokens, passwords, private keys, credentials, private URLs, unnecessary personal data, guesses, transient terminal output, one-off errors, or low-value noise.
+
+If there is a conflict, a possible secret, uncertainty about whether the fact is durable, or a write would modify files outside `AI Memory/`, ask the user first.
+
+Git commit and push are still forbidden unless the user explicitly asks for them.
+RULES
+  fi
+
+  created+=("AGENTS.md autonomous memory write rules")
+}
+
 if [[ -e "$TARGET_ROOT/AGENTS.md" ]]; then
   skipped+=("AGENTS.md")
 else
   cp "$TEMPLATE_AGENTS" "$TARGET_ROOT/AGENTS.md"
   created+=("AGENTS.md")
+fi
+
+if (( auto_write_memory )); then
+  confirm_auto_write_memory
+  append_auto_write_rules "$TARGET_ROOT/AGENTS.md" "$lang"
 fi
 
 MEMORY_DIR="$TARGET_ROOT/AI Memory"

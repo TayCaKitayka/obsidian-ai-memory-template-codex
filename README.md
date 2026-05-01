@@ -55,6 +55,38 @@ To initialize without starting Codex:
 codex-project --init-only
 ```
 
+## Autonomous Memory Writes
+
+By default, the agent asks before writing memory.
+
+If you want the agent to update `AI Memory/` without per-write confirmation, enable the unsafe opt-in mode:
+
+```bash
+codex-project --auto-write-memory
+```
+
+This shows a warning and requires typing:
+
+```text
+ENABLE AUTO MEMORY WRITE
+```
+
+On macOS, `codex-project` also attempts to show a system warning dialog before the terminal confirmation. In other environments, the terminal confirmation is the safety gate.
+
+When enabled, `codex-project` appends an `Autonomous Memory Write Mode` section to the project's `AGENTS.md`.
+
+The agent may then write durable project knowledge to `AI Memory/` automatically, but it must still:
+
+- read `_index.md` and the target memory file first;
+- check duplicates and conflicts;
+- prefer append-only edits;
+- append to `_log.md`;
+- never store secrets, tokens, passwords, private keys, credentials, private URLs, unnecessary personal data, guesses, transient terminal output, one-off errors, or low-value noise;
+- ask first when there is a conflict, secret risk, uncertainty, or a write outside `AI Memory/`;
+- never commit or push unless explicitly asked.
+
+Use this only in trusted projects.
+
 ## Cloud / Synced Memory
 
 By default, every project gets its own local `AI Memory/` directory.
@@ -89,6 +121,12 @@ To use a custom cloud folder name:
 
 ```bash
 codex-project --cloud-root "$HOME/Cloud/AI Memory Projects" --project-name mobile_app
+```
+
+You can combine cloud memory and autonomous memory writes:
+
+```bash
+codex-project --cloud-root "$HOME/Cloud/AI Memory Projects" --auto-write-memory
 ```
 
 ## Localization

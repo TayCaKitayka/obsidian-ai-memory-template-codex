@@ -13,6 +13,7 @@ print "Installed codex-project -> $TARGET"
 print "Use English templates: codex-project"
 print "Use Russian templates: codex-project --lang ru"
 print "Use cloud memory: codex-project --cloud-root /path/to/cloud/AI-Memory"
+print "Enable autonomous memory writes: codex-project --auto-write-memory"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
