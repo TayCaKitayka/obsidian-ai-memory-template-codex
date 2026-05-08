@@ -3,6 +3,7 @@
 # AI memory scaffold
 /AI Memory/
 /AI Memory/**
+/.codex-project.env
 *.memory.local.md
 *.local.md
 *.secret.md

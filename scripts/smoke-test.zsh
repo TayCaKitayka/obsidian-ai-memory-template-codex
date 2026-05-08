@@ -80,6 +80,32 @@ override_dir="$(mktemp -d "${TMP_ROOT}/override.XXXXXX")"
   check_file "$override_dir/AI Memory/_index.md"
 )
 
+print -r -- "smoke-test: settings"
+settings_home="$(mktemp -d "${TMP_ROOT}/home.XXXXXX")"
+settings_dir="$TMP_ROOT/settings"
+settings_vault="$(mktemp -d "${TMP_ROOT}/settings-vault.XXXXXX")"
+(
+  export HOME="$settings_home"
+  export XDG_CONFIG_HOME="$settings_home/.config"
+  export CODEX_MEMORY_LANG=ru
+  export CODEX_MEMORY_OBSIDIAN_ROOT="$settings_vault"
+  export CODEX_MEMORY_DEFAULT_REMOTELY_SAVE=1
+  export CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY=0
+  mkdir -p "$settings_dir"
+  cd "$settings_dir"
+  "$REPO_ROOT/bin/codex-project" --settings >/dev/null
+  check_file "$XDG_CONFIG_HOME/codex-project/settings.env"
+  unset CODEX_MEMORY_LANG CODEX_MEMORY_OBSIDIAN_ROOT CODEX_MEMORY_DEFAULT_REMOTELY_SAVE CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY
+  "$REPO_ROOT/bin/codex-project" --init-only >/dev/null
+  check_file "$settings_dir/AGENTS.md"
+  check_file "$settings_dir/AI Memory/_index.md"
+  check_file "$settings_dir/AI Memory/map.md"
+  check_file "$settings_dir/AI Memory/remotely-save.md"
+  check_file "$settings_vault/settings/AI Memory/_index.md"
+  check_file "$settings_vault/settings/AI Memory/map.md"
+  check_file "$settings_vault/settings/AI Memory/remotely-save.md"
+)
+
 print -r -- "smoke-test: remotely-save"
 remote_dir="$(mktemp -d "${TMP_ROOT}/remote.XXXXXX")"
 (

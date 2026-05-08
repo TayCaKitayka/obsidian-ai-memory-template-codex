@@ -79,6 +79,28 @@ codex-project lint
 codex-project save --title "checkpoint" --note "Smoke test passed"
 ```
 
+## Глобальные Настройки
+
+Один раз запусти мастер настроек:
+
+```bash
+codex-project --settings
+```
+
+Это создаст `~/.config/codex-project/settings.env` и будет автоматически использоваться во всех проектах.
+Если stdin не интерактивный, файл будет записан из текущих значений окружения.
+После выбора языка мастер переключается на английский или русский интерфейс.
+
+Через этот файл удобно задать значения по умолчанию:
+
+- `CODEX_MEMORY_LANG`
+- `CODEX_MEMORY_OBSIDIAN_ROOT` или `CODEX_MEMORY_CLOUD_ROOT`
+- `CODEX_MEMORY_PROJECT_NAME`
+- `CODEX_MEMORY_DEFAULT_REMOTELY_SAVE`
+- `CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY`
+
+Также поддерживается локальный override-файл `./.codex-project.env`, но нормальный сценарий — именно глобальный файл.
+
 ## Примеры Codex CLI
 
 Пробрасывай флаги в Codex после `--`:

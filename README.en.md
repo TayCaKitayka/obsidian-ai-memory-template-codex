@@ -79,6 +79,28 @@ codex-project lint
 codex-project save --title "checkpoint" --note "Smoke test passed"
 ```
 
+## Global Settings
+
+Run this once to open the global settings wizard:
+
+```bash
+codex-project --settings
+```
+
+It writes `~/.config/codex-project/settings.env` and loads it automatically for every project.
+If stdin is not interactive, it writes the file from the current environment instead.
+The interactive wizard switches to English or Russian after the language choice.
+
+Use it for default values like:
+
+- `CODEX_MEMORY_LANG`
+- `CODEX_MEMORY_OBSIDIAN_ROOT` or `CODEX_MEMORY_CLOUD_ROOT`
+- `CODEX_MEMORY_PROJECT_NAME`
+- `CODEX_MEMORY_DEFAULT_REMOTELY_SAVE`
+- `CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY`
+
+`codex-project` also accepts an optional local override file at `./.codex-project.env`, but the global file is the normal one.
+
 ## Codex CLI Examples
 
 Pass flags to Codex after `--`:

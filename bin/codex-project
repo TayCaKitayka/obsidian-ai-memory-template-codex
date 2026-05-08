@@ -17,10 +17,19 @@ warnings=()
 doctor_mode=0
 lint_mode=0
 save_mode=0
+settings_mode=0
 init_only=0
 override_agents=0
 remotely_save=0
 auto_write_memory=0
+lang_cli_set=0
+cloud_root_cli_set=0
+obsidian_root_cli_set=0
+project_name_cli_set=0
+override_agents_cli_set=0
+remotely_save_cli_set=0
+auto_write_memory_cli_set=0
+settings_target=""
 lang="${CODEX_MEMORY_LANG:-en}"
 cloud_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
 obsidian_root="${CODEX_MEMORY_OBSIDIAN_ROOT:-${CODEX_MEMORY_VAULT_ROOT:-}}"
@@ -28,6 +37,35 @@ project_name="${CODEX_MEMORY_PROJECT_NAME:-${TARGET_ROOT:t}}"
 save_title=""
 save_note=""
 codex_args=()
+global_settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/codex-project/settings.env"
+local_settings_file="$TARGET_ROOT/.codex-project.env"
+settings_lang=""
+settings_cloud_root=""
+settings_obsidian_root=""
+settings_project_name=""
+settings_override_agents=""
+settings_remotely_save=""
+settings_auto_write_memory=""
+env_lang_present=0
+env_cloud_root_present=0
+env_obsidian_root_present=0
+env_project_name_present=0
+
+if [[ -n "${CODEX_MEMORY_LANG+x}" ]]; then
+  env_lang_present=1
+fi
+
+if [[ -n "${CODEX_MEMORY_CLOUD_ROOT+x}" ]]; then
+  env_cloud_root_present=1
+fi
+
+if [[ -n "${CODEX_MEMORY_OBSIDIAN_ROOT+x}" || -n "${CODEX_MEMORY_VAULT_ROOT+x}" ]]; then
+  env_obsidian_root_present=1
+fi
+
+if [[ -n "${CODEX_MEMORY_PROJECT_NAME+x}" ]]; then
+  env_project_name_present=1
+fi
 
 die() {
   print -u2 -r -- "codex-project: $1"
@@ -64,6 +102,12 @@ Options:
       Create AGENTS.override.md instead of AGENTS.md.
   --remotely-save
       Add safe Obsidian Remotely Save documentation files.
+  --settings
+      Start the global Codex settings wizard and save defaults for every project.
+      When stdin is not interactive, writes a settings file from the current
+      environment instead.
+  --settings FILE
+      Write settings to FILE instead of the default global location.
   --auto-write-memory
       Enable unsafe autonomous writes to AI Memory after warning confirmation.
   --unsafe-auto-write-memory
@@ -86,6 +130,10 @@ Environment:
       Alias for CODEX_MEMORY_OBSIDIAN_ROOT.
   CODEX_MEMORY_PROJECT_NAME
       Default project folder name for cloud-root mode.
+  Global settings file
+      ~/.config/codex-project/settings.env
+      Loaded automatically for every project. Use `codex-project --settings`
+      to create it.
 
 Passthrough:
   Arguments after -- are forwarded to codex unchanged.
@@ -111,6 +159,251 @@ resolve_template_root() {
   fi
 
   print -r -- ""
+}
+
+resolve_settings_file() {
+  local target="${1:-}"
+
+  if [[ -n "$target" ]]; then
+    print -r -- "${target:A}"
+    return 0
+  fi
+
+  print -r -- "$global_settings_file"
+}
+
+strip_setting_quotes() {
+  local value="$1"
+
+  if [[ "$value" == \"*\" ]]; then
+    value="${value#\"}"
+    value="${value%\"}"
+  elif [[ "$value" == \'*\' ]]; then
+    value="${value#\'}"
+    value="${value%\'}"
+  fi
+
+  print -r -- "$value"
+}
+
+quote_setting_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  print -r -- "\"$value\""
+}
+
+wizard_prompt_text() {
+  local prompt="$1"
+  local default="$2"
+  local response=""
+
+  if [[ -t 0 ]]; then
+    print -u2 -n -- "$prompt [$default]: "
+    if ! read -r response; then
+      response=""
+    fi
+  else
+    response="$default"
+  fi
+
+  [[ -n "$response" ]] || response="$default"
+  print -r -- "$response"
+}
+
+wizard_prompt_yes_no() {
+  local prompt="$1"
+  local default="$2"
+  local response
+
+  response="$(wizard_prompt_text "$prompt" "$default")"
+  case "${response:l}" in
+    y|yes|1|true|on)
+      print -r -- "1"
+      ;;
+    n|no|0|false|off)
+      print -r -- "0"
+      ;;
+    *)
+      case "${default:l}" in
+        y|yes|1|true|on)
+          print -r -- "1"
+          ;;
+        *)
+          print -r -- "0"
+          ;;
+      esac
+      ;;
+  esac
+}
+
+run_settings_wizard() {
+  local root_mode=""
+  local root_path=""
+  local root_default="${HOME}/Obsidian-codex"
+  local prompt_root_mode
+  local prompt_root_path
+  local prompt_override
+  local prompt_remotely
+  local prompt_auto_write
+  local lang_choice
+  local override_choice
+  local remotely_choice
+  local auto_write_choice
+  local root_mode_choice
+
+  lang_choice="$(wizard_prompt_text "Choose default language / Выберите язык настроек: 1) English 2) Russian" "1")"
+  case "$lang_choice" in
+    2|ru|RU|rU|Ru)
+      settings_lang="ru"
+      ;;
+    *)
+      settings_lang="en"
+      ;;
+  esac
+
+  if [[ "$settings_lang" == "ru" ]]; then
+    prompt_root_mode="Где хранить общую AI Memory: 1) только локально 2) в Obsidian vault 3) в cloud-папке"
+    prompt_root_path="Путь к общей папке памяти"
+    prompt_override="Создавать AGENTS.override.md по умолчанию"
+    prompt_remotely="Включить Remotely Save документацию по умолчанию"
+    prompt_auto_write="Включить unsafe auto-write-memory по умолчанию"
+  else
+    prompt_root_mode="Where should shared AI Memory live: 1) local only 2) Obsidian vault 3) cloud folder"
+    prompt_root_path="Shared memory folder"
+    prompt_override="Create AGENTS.override.md by default"
+    prompt_remotely="Enable Remotely Save docs by default"
+    prompt_auto_write="Enable unsafe auto-write-memory by default"
+  fi
+
+  root_mode_choice="$(wizard_prompt_text "$prompt_root_mode" "2")"
+  case "$root_mode_choice" in
+    1|local|LOCAL)
+      root_mode="local"
+      ;;
+    3|cloud|CLOUD)
+      root_mode="cloud"
+      ;;
+    *)
+      root_mode="obsidian"
+      ;;
+  esac
+
+  if [[ "$root_mode" == "obsidian" ]]; then
+    root_path="$(wizard_prompt_text "$prompt_root_path" "$root_default")"
+    settings_obsidian_root="${root_path/#\~/$HOME}"
+    settings_cloud_root=""
+  elif [[ "$root_mode" == "cloud" ]]; then
+    root_path="$(wizard_prompt_text "$prompt_root_path" "$root_default")"
+    settings_cloud_root="${root_path/#\~/$HOME}"
+    settings_obsidian_root=""
+  else
+    settings_cloud_root=""
+    settings_obsidian_root=""
+  fi
+
+  override_choice="$(wizard_prompt_yes_no "$prompt_override" "n")"
+  remotely_choice="$(wizard_prompt_yes_no "$prompt_remotely" "y")"
+  auto_write_choice="$(wizard_prompt_yes_no "$prompt_auto_write" "n")"
+
+  settings_override_agents="$override_choice"
+  settings_remotely_save="$remotely_choice"
+  settings_auto_write_memory="$auto_write_choice"
+  settings_project_name=""
+
+  if [[ "$settings_lang" == "ru" ]]; then
+    print -u2 -- "Мастер настроек завершён."
+  else
+    print -u2 -- "Settings wizard completed."
+  fi
+}
+
+load_settings_file() {
+  local file="$1"
+  local line
+  local key
+  local value
+
+  [[ -f "$file" ]] || return 0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    case "$line" in
+      ''|'#'*) continue ;;
+      export\ *) line="${line#export }" ;;
+    esac
+
+    case "$line" in
+      *'='*)
+        key="${line%%=*}"
+        value="${line#*=}"
+        ;;
+      *)
+        continue
+        ;;
+    esac
+
+    value="$(strip_setting_quotes "$value")"
+
+    case "$key" in
+      CODEX_MEMORY_LANG)
+        settings_lang="$value"
+        ;;
+      CODEX_MEMORY_CLOUD_ROOT)
+        settings_cloud_root="$value"
+        ;;
+      CODEX_MEMORY_OBSIDIAN_ROOT|CODEX_MEMORY_VAULT_ROOT)
+        settings_obsidian_root="$value"
+        ;;
+      CODEX_MEMORY_PROJECT_NAME)
+        settings_project_name="$value"
+        ;;
+      CODEX_MEMORY_DEFAULT_OVERRIDE)
+        settings_override_agents="$value"
+        ;;
+      CODEX_MEMORY_DEFAULT_REMOTELY_SAVE)
+        settings_remotely_save="$value"
+        ;;
+      CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY)
+        settings_auto_write_memory="$value"
+        ;;
+    esac
+  done < "$file"
+}
+
+write_settings_file() {
+  local file="$1"
+
+  mkdir -p "${file:h}"
+  if [[ -e "$file" ]]; then
+    skipped+=("settings file $file")
+    return 0
+  fi
+
+  cat > "$file" <<EOF
+# codex-project settings
+# This file is loaded automatically for every project.
+# Use simple KEY=value lines.
+#
+# Supported keys:
+#   CODEX_MEMORY_LANG=en|ru
+#   CODEX_MEMORY_CLOUD_ROOT=/path/to/cloud/root
+#   CODEX_MEMORY_OBSIDIAN_ROOT=/path/to/obsidian/vault
+#   CODEX_MEMORY_VAULT_ROOT=/path/to/obsidian/vault
+#   CODEX_MEMORY_PROJECT_NAME=project-folder-name
+#   CODEX_MEMORY_DEFAULT_OVERRIDE=0|1
+#   CODEX_MEMORY_DEFAULT_REMOTELY_SAVE=0|1
+#   CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY=0|1
+
+CODEX_MEMORY_LANG=$(quote_setting_value "$settings_lang")
+CODEX_MEMORY_CLOUD_ROOT=$(quote_setting_value "$settings_cloud_root")
+CODEX_MEMORY_OBSIDIAN_ROOT=$(quote_setting_value "$settings_obsidian_root")
+CODEX_MEMORY_PROJECT_NAME=$(quote_setting_value "$settings_project_name")
+CODEX_MEMORY_DEFAULT_OVERRIDE=$(quote_setting_value "$settings_override_agents")
+CODEX_MEMORY_DEFAULT_REMOTELY_SAVE=$(quote_setting_value "$settings_remotely_save")
+CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY=$(quote_setting_value "$settings_auto_write_memory")
+EOF
+
+  created+=("settings file $file")
 }
 
 copy_template_file() {
@@ -222,7 +515,7 @@ ensure_gitignore_block() {
   local tmp
   local inserted=0
   local line
-  required=("/AI Memory/" "/AI Memory/**" "*.memory.local.md")
+  required=("/AI Memory/" "/AI Memory/**" "/.codex-project.env" "*.memory.local.md")
   missing=()
 
   if [[ ! -f "$file" ]]; then
@@ -579,6 +872,19 @@ while (($#)); do
       usage
       exit 0
       ;;
+    --settings)
+      settings_mode=1
+      shift
+      if (($#)) && [[ "${1:-}" != -* ]]; then
+        settings_target="$1"
+        shift
+      fi
+      ;;
+    --settings=*)
+      settings_mode=1
+      settings_target="${1#--settings=}"
+      shift
+      ;;
     --init-only|--no-start)
       init_only=1
       shift
@@ -586,58 +892,71 @@ while (($#)); do
     --lang)
       (($# < 2)) && die "--lang requires en or ru"
       lang="$2"
+      lang_cli_set=1
       shift 2
       ;;
     --lang=*)
       lang="${1#--lang=}"
+      lang_cli_set=1
       shift
       ;;
     --cloud-root)
       (($# < 2)) && die "--cloud-root requires a directory"
       cloud_root="$2"
+      cloud_root_cli_set=1
       shift 2
       ;;
     --cloud-root=*)
       cloud_root="${1#--cloud-root=}"
+      cloud_root_cli_set=1
       shift
       ;;
     --obsidian-root)
       (($# < 2)) && die "--obsidian-root requires a directory"
       obsidian_root="$2"
+      obsidian_root_cli_set=1
       shift 2
       ;;
     --obsidian-root=*)
       obsidian_root="${1#--obsidian-root=}"
+      obsidian_root_cli_set=1
       shift
       ;;
     --vault-root)
       (($# < 2)) && die "--vault-root requires a directory"
       obsidian_root="$2"
+      obsidian_root_cli_set=1
       shift 2
       ;;
     --vault-root=*)
       obsidian_root="${1#--vault-root=}"
+      obsidian_root_cli_set=1
       shift
       ;;
     --project-name)
       (($# < 2)) && die "--project-name requires a name"
       project_name="$2"
+      project_name_cli_set=1
       shift 2
       ;;
     --project-name=*)
       project_name="${1#--project-name=}"
+      project_name_cli_set=1
       shift
       ;;
     --override)
       override_agents=1
+      override_agents_cli_set=1
       shift
       ;;
     --remotely-save)
       remotely_save=1
+      remotely_save_cli_set=1
       shift
       ;;
     --auto-write-memory|--unsafe-auto-write-memory)
       auto_write_memory=1
+      auto_write_memory_cli_set=1
       shift
       ;;
     --)
@@ -651,6 +970,56 @@ while (($#)); do
       ;;
   esac
 done
+
+if (( settings_mode )); then
+  if [[ -t 0 ]]; then
+    run_settings_wizard
+  else
+    settings_lang="$lang"
+    settings_cloud_root="$cloud_root"
+    settings_obsidian_root="$obsidian_root"
+    settings_project_name=""
+    settings_override_agents="$override_agents"
+    settings_remotely_save="$remotely_save"
+    settings_auto_write_memory="$auto_write_memory"
+  fi
+  settings_file="$(resolve_settings_file "$settings_target")"
+  write_settings_file "$settings_file"
+  print -r -- "codex-project: wrote settings file: $settings_file"
+  print -r -- "codex-project: run codex-project again without arguments to use these defaults"
+  exit 0
+fi
+
+load_settings_file "$global_settings_file"
+load_settings_file "$local_settings_file"
+
+if (( ! lang_cli_set && ! env_lang_present )) && [[ -n "$settings_lang" ]]; then
+  lang="$settings_lang"
+fi
+
+if (( ! cloud_root_cli_set && ! env_cloud_root_present )) && [[ -n "$settings_cloud_root" ]]; then
+  cloud_root="$settings_cloud_root"
+fi
+
+if (( ! obsidian_root_cli_set && ! env_obsidian_root_present )) && [[ -n "$settings_obsidian_root" ]]; then
+  obsidian_root="$settings_obsidian_root"
+fi
+
+if (( ! project_name_cli_set && ! env_project_name_present )) && [[ -n "$settings_project_name" ]]; then
+  project_name="$settings_project_name"
+fi
+
+if (( ! override_agents_cli_set )) && [[ -n "$settings_override_agents" ]]; then
+  override_agents="$settings_override_agents"
+fi
+
+if (( ! remotely_save_cli_set )) && [[ -n "$settings_remotely_save" ]]; then
+  remotely_save="$settings_remotely_save"
+fi
+
+if (( ! auto_write_memory_cli_set )) && [[ -n "$settings_auto_write_memory" ]]; then
+  auto_write_memory="$settings_auto_write_memory"
+fi
 
 case "$lang" in
   en|ru) ;;
