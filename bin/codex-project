@@ -222,7 +222,7 @@ ensure_gitignore_block() {
   local tmp
   local inserted=0
   local line
-  required=("AI Memory/" "AI Memory/**" "*.memory.local.md")
+  required=("/AI Memory/" "/AI Memory/**" "*.memory.local.md")
   missing=()
 
   if [[ ! -f "$file" ]]; then
@@ -237,9 +237,15 @@ ensure_gitignore_block() {
   fi
 
   for line in "${required[@]}"; do
-    if ! grep -Fxq -- "$line" "$file"; then
-      missing+=("$line")
+    if [[ "$line" == /AI\ Memory/* ]]; then
+      local legacy_line="${line#/}"
+      if grep -Fxq -- "$line" "$file" || grep -Fxq -- "$legacy_line" "$file"; then
+        continue
+      fi
+    elif grep -Fxq -- "$line" "$file"; then
+      continue
     fi
+    missing+=("$line")
   done
 
   if (( ${#missing[@]} == 0 )); then

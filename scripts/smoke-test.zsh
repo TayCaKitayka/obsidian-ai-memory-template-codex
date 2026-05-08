@@ -33,8 +33,8 @@ check_file() {
 
 check_gitignore() {
   local file="$1"
-  grep -Fxq -- "AI Memory/" "$file"
-  grep -Fxq -- "AI Memory/**" "$file"
+  grep -Fxq -- "/AI Memory/" "$file"
+  grep -Fxq -- "/AI Memory/**" "$file"
   grep -Fxq -- "*.memory.local.md" "$file"
 }
 
