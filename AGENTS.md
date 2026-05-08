@@ -67,3 +67,46 @@ When saving memory from explicit save commands such as `Save to Obsidian: ...`, 
 7. Append a log entry to `AI Memory/_log.md`.
 
 Always preserve history.
+
+## Автономная запись в память
+
+Этот проект запущен с включённым `--auto-write-memory`.
+
+Агент может обновлять файлы `AI Memory/` без отдельного подтверждения перед каждой записью, если обнаружил устойчивую информацию, полезную для будущих AI coding sessions.
+
+Разрешено автоматически сохранять:
+
+- проверенные команды запуска, тестов, сборки, линтинга и диагностики
+- архитектурные решения и связи компонентов
+- настройки окружения разработки и setup steps
+- conventions проекта и правила именования
+- известные проблемы, ограничения, workaround и риски
+- устойчивые задачи, roadmap items и follow-ups
+- краткие итоги существенных coding sessions
+
+Перед записью всё равно нужно:
+
+1. Прочитать `AI Memory/_index.md`.
+2. Выбрать целевой memory-файл.
+3. Прочитать целевой файл.
+4. Проверить дубли по смыслу.
+5. Проверить конфликты с активными фактами.
+6. Предпочитать append-only изменения.
+7. Добавить запись в `AI Memory/_log.md`.
+
+Нельзя автоматически сохранять секреты, токены, пароли, private keys, credentials, private URLs, лишние персональные данные, догадки, временный вывод терминала, одноразовые ошибки или низкоценный шум.
+
+Если есть конфликт, риск секрета, сомнение в устойчивости факта или запись требует изменения файлов вне `AI Memory/`, нужно сначала спросить пользователя.
+
+Git commit и push всё равно запрещены без явной команды пользователя.
+
+## Project Override File
+
+If `AGENTS.override.md` exists in the project root, read it after `AGENTS.md` and treat it as a project-specific override.
+Keep `AGENTS.md` as the baseline scaffold and use `AGENTS.override.md` for local project instructions that should not rewrite the shared template.
+
+## Remotely Save
+
+If `AI Memory/remotely-save.md` exists, read it before making decisions about Obsidian sync, vault layout, or cloud-backed memory.
+Never write secrets, tokens, passwords, private keys, or Remotely Save credentials into memory files.
+Ask before changing Remotely Save-related files unless `--unsafe-auto-write-memory` is explicitly enabled for this project.

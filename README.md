@@ -1,53 +1,69 @@
 # Obsidian AI Memory Template
 
-A small Markdown memory scaffold for AI coding agents such as Codex.
+This repository is a lightweight, Codex-first Markdown memory scaffold for Obsidian vaults and AI coding agents.
+It stays small, explicit, and safe.
 
-It creates project-local memory files that an agent can read through `AGENTS.md` before answering or editing code.
+## What This Is
 
-## Included
+- A reusable scaffold for `AGENTS.md`, `AGENTS.override.md`, and `AI Memory/` templates.
+- A helper command for initializing memory in a project and launching Codex.
+- A safe documentation set for Obsidian Remotely Save workflows.
 
-- `AGENTS.md` - instructions for agent memory lookup and smart save.
-- `templates/AI Memory/` - empty personal and project memory templates.
-- `locales/ru/` - Russian agent instructions and memory templates.
-- `bin/codex-project` - helper command that initializes memory in the current project and starts Codex.
-- `install.sh` - local installer that symlinks `codex-project` into `~/.local/bin`.
+## Why This Exists
 
-## Not Included
+Codex works better when it has a small, predictable place for durable project context.
+This project gives it that place without turning the repo into a large wiki or automation stack.
 
-- Personal facts.
-- Private Obsidian notes.
-- Secrets, tokens, passwords, private keys.
+## What It Is Not
 
-## Install
+- Not a full knowledge base.
+- Not a large claude-obsidian clone.
+- Not an ingest pipeline.
+- Not an autonomous wiki builder.
+- Not a place for secrets, tokens, passwords, or private plugin config.
 
-Clone this repository, then run:
+## Quick Start
 
 ```bash
 ./install.sh
+codex-project --help
+codex-project --init-only
 ```
 
-If needed, add `~/.local/bin` to your `PATH`:
+If `codex-project` is not found after install, add `~/.local/bin` to your `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Use In A Project
+## Install
 
-From any project directory:
+Clone this repository and run:
+
+```bash
+./install.sh
+```
+
+The installer symlinks `bin/codex-project` into `~/.local/bin`.
+
+If you move the repository later, rerun `./install.sh` so the symlink points at the current clone.
+
+## Usage
+
+Run the initializer from any project directory:
 
 ```bash
 codex-project
 ```
 
-The command will:
+This will:
 
-- create `AGENTS.md` if missing;
-- create `AI Memory/` if missing;
-- copy empty memory templates;
+- create `AGENTS.md` or `AGENTS.override.md`;
+- create `AI Memory/` and copy the memory templates;
 - replace `YYYY-MM-DD` with today's date;
-- skip existing files instead of overwriting them;
-- start `codex -C "$PWD"`.
+- keep existing files instead of overwriting them;
+- update `.gitignore` with safe AI memory ignore rules;
+- start `codex -C "$PWD"` unless `--init-only` is used.
 
 To initialize without starting Codex:
 
@@ -55,79 +71,152 @@ To initialize without starting Codex:
 codex-project --init-only
 ```
 
-## Autonomous Memory Writes
-
-By default, the agent asks before writing memory.
-
-If you want the agent to update `AI Memory/` without per-write confirmation, enable the unsafe opt-in mode:
+To see all options:
 
 ```bash
-codex-project --auto-write-memory
+codex-project --help
 ```
 
-This shows a warning and requires typing:
-
-```text
-ENABLE AUTO MEMORY WRITE
-```
-
-On macOS, `codex-project` also attempts to show a system warning dialog before the terminal confirmation. In other environments, the terminal confirmation is the safety gate.
-
-When enabled, `codex-project` appends an `Autonomous Memory Write Mode` section to the project's `AGENTS.md`.
-
-The agent may then write durable project knowledge to `AI Memory/` automatically, but it must still:
-
-- read `_index.md` and the target memory file first;
-- check duplicates and conflicts;
-- prefer append-only edits;
-- append to `_log.md`;
-- never store secrets, tokens, passwords, private keys, credentials, private URLs, unnecessary personal data, guesses, transient terminal output, one-off errors, or low-value noise;
-- ask first when there is a conflict, secret risk, uncertainty, or a write outside `AI Memory/`;
-- never commit or push unless explicitly asked.
-
-Use this only in trusted projects.
-
-## Cloud / Synced Memory
-
-By default, every project gets its own local `AI Memory/` directory.
-
-To keep project memory in a shared cloud folder, pass `--cloud-root`:
+Useful subcommands:
 
 ```bash
-codex-project --cloud-root "$HOME/Library/Mobile Documents/com~apple~CloudDocs/AI Memory Projects"
+codex-project doctor
+codex-project lint
+codex-project save --title "checkpoint" --note "Smoke test passed"
 ```
 
-The command will create:
+## Codex CLI Examples
 
-```text
-<cloud-root>/<project-name>/AI Memory/
-```
-
-and link it into the current project:
-
-```text
-your-project/AI Memory -> <cloud-root>/<project-name>/AI Memory
-```
-
-You can set a default cloud root:
+Pass flags to Codex after `--`:
 
 ```bash
-export CODEX_MEMORY_CLOUD_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/AI Memory Projects"
+codex-project -- --model gpt-5.1
+codex-project -- --ask-for-approval on-request
+codex-project -- --sandbox workspace-write
+codex-project -- --search
 ```
 
-If the current project already has a regular `AI Memory/` directory, `codex-project` will not replace it automatically. It will make a non-destructive first copy into the cloud folder with `rsync --ignore-existing`, then warn you. For ongoing cross-device sync, move or rename the existing local directory first, then rerun with `--cloud-root` so the project can use a symlink.
+## AGENTS.md Compatibility
 
-To use a custom cloud folder name:
+`AGENTS.md` is the baseline agent instruction file.
+It tells Codex how to route memory lookup, how to save durable facts, and when to avoid secrets.
+
+If the project needs local overrides without rewriting the baseline, use `AGENTS.override.md`.
+
+## AGENTS.override.md
+
+Use `AGENTS.override.md` when a project needs extra instructions that are specific to the current vault or repo.
+`codex-project --override` creates `AGENTS.override.md` instead of `AGENTS.md` and leaves any existing `AGENTS.md` untouched.
+
+## AI Memory Layout
+
+The scaffold creates a small set of markdown files under `AI Memory/`:
+
+- `project-overview.md`
+- `architecture.md`
+- `dev-environment.md`
+- `commands.md`
+- `conventions.md`
+- `known-issues.md`
+- `tasks.md`
+- `session-summaries.md`
+- optional `remotely-save.md`
+
+The memory index is the routing map for long-term memory.
+
+## Cloud / Symlink Workflow
+
+`codex-project --cloud-root DIR` stores `AI Memory/` in a shared cloud folder and links it back into the project when possible.
+
+Example:
 
 ```bash
-codex-project --cloud-root "$HOME/Cloud/AI Memory Projects" --project-name mobile_app
+codex-project --cloud-root "$HOME/Cloud/AI Memory Projects"
 ```
 
-You can combine cloud memory and autonomous memory writes:
+You can also set a default cloud root:
 
 ```bash
-codex-project --cloud-root "$HOME/Cloud/AI Memory Projects" --auto-write-memory
+export CODEX_MEMORY_CLOUD_ROOT="$HOME/Cloud/AI Memory Projects"
 ```
+
+Recommended layouts:
+
+1. Full vault sync: the repo lives inside an Obsidian vault and Remotely Save syncs the whole vault.
+2. Cloud AI Memory folder: `AI Memory/` is a symlink to a cloud-backed folder.
+3. Markdown-only sync: only the memory notes sync, while `.obsidian/` stays local.
+
+## Remotely Save Support
+
+Obsidian Remotely Save can sync vault files across devices, but the sync scope should be explicit.
+
+- Do not generate or commit credentials.
+- Do not assume the user wants to sync `.obsidian/`.
+- Treat Remotely Save provider settings as private configuration.
+- Prefer markdown-only sync unless the user explicitly wants broader vault sync.
+
+Run the helper mode to add safe documentation:
+
+```bash
+codex-project --remotely-save
+```
+
+This adds a memory note for safe sync layouts and a project docs note in `docs/remotely-save.md` when needed.
+
+## Safety Model
+
+- Never store secrets, tokens, passwords, private keys, or private URLs in memory files.
+- Never auto-write Remotely Save credentials.
+- Ask before changing Remotely Save-related files unless unsafe auto-write mode is enabled.
+- Keep writes append-only when possible.
+- Prefer explicit confirmation for durable facts that are not yet stable.
+
+## Git Ignore Behavior
+
+New projects get a safe `.gitignore` block for AI memory files:
+
+- `AI Memory/`
+- `AI Memory/**`
+- `*.memory.local.md`
+
+The block is appended only when entries are missing.
+
+## Doctor Mode
+
+Check a project before using it:
+
+```bash
+codex-project doctor
+```
+
+Doctor verifies shell availability, Codex availability, template resolution, directory writability, memory files, Git ignore status, and optional cloud-root setup.
+
+## Comparison With claude-obsidian
+
+`claude-obsidian` is a larger Obsidian wiki and knowledge-engine style project.
+This repository is intentionally smaller.
+
+It focuses on:
+
+- Codex-first project memory
+- explicit routing through `AI Memory/_index.md`
+- safe, reviewable file creation
+- simple shell workflows
+- Remotely Save documentation without credential automation
+
+It intentionally avoids:
+
+- ingest pipelines
+- autonomous wiki building
+- large-scale note synthesis
+- complex automation layers
+
+## Troubleshooting
+
+- If `codex-project` is missing after install, make sure `~/.local/bin` is in your `PATH`.
+- If template resolution fails, set `CODEX_MEMORY_TEMPLATE_ROOT` to the repository root that contains `templates/AI Memory/`.
+- If `doctor` reports that `AI Memory/` is tracked by Git, the project is not yet using the scaffolded ignore rules.
+- If you want a shared memory folder, create it first and rerun with `--cloud-root`.
 
 ## Localization
 
@@ -148,8 +237,6 @@ You can also set a default language:
 ```bash
 export CODEX_MEMORY_LANG=ru
 ```
-
-Both localizations understand English and Russian memory commands.
 
 ## Memory Workflow
 
@@ -197,20 +284,3 @@ Russian confirmation:
 ```text
 Да, запиши
 ```
-
-## Memory Files
-
-- `project-overview.md` - purpose, scope, and durable project context.
-- `architecture.md` - architecture, components, and technical decisions.
-- `dev-environment.md` - local setup, dependencies, and requirements.
-- `commands.md` - verified run, test, lint, build, and diagnostic commands.
-- `conventions.md` - coding style, file structure, and naming rules.
-- `known-issues.md` - known bugs, limitations, risks, and workarounds.
-- `tasks.md` - durable tasks, roadmap items, and follow-ups.
-- `session-summaries.md` - concise summaries of substantial coding sessions.
-
-## Safety
-
-Do not store secrets in memory files.
-
-Keep private memory out of public repositories. The `.gitignore` excludes a root-level `AI Memory/` directory so this template repository does not accidentally track a local private memory folder.

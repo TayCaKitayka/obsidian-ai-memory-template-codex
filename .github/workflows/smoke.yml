@@ -1,0 +1,33 @@
+name: smoke
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zsh on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
+
+      - name: Make scripts executable
+        run: chmod +x install.sh bin/codex-project scripts/smoke-test.zsh
+
+      - name: Syntax checks
+        run: |
+          zsh -n install.sh
+          zsh -n bin/codex-project
+          zsh -n scripts/smoke-test.zsh
+
+      - name: Smoke test
+        run: ./scripts/smoke-test.zsh

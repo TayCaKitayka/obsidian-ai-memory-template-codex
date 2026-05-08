@@ -3,190 +3,131 @@ set -euo pipefail
 
 SCRIPT_PATH="${0:A}"
 SCRIPT_DIR="${SCRIPT_PATH:h}"
-
-if [[ -n "${CODEX_MEMORY_TEMPLATE_ROOT:-}" ]]; then
-  TEMPLATE_ROOT="$CODEX_MEMORY_TEMPLATE_ROOT"
-elif [[ -d "$SCRIPT_DIR/../templates/AI Memory" ]]; then
-  TEMPLATE_ROOT="${SCRIPT_DIR:h}"
-elif [[ -d "$HOME/Desktop/ObsidianVault/ai-memory-public/templates/AI Memory" ]]; then
-  TEMPLATE_ROOT="$HOME/Desktop/ObsidianVault/ai-memory-public"
-else
-  TEMPLATE_ROOT=""
-fi
-
-TARGET_ROOT="$PWD"
+REPO_ROOT="${SCRIPT_DIR:h}"
+TARGET_ROOT="${PWD:A}"
 TODAY="$(date +%F)"
 
-usage() {
-  cat <<'USAGE'
-Usage: codex-project [--lang en|ru] [--cloud-root DIR] [--project-name NAME] [--auto-write-memory] [--init-only] [--no-start] [--help] [-- <codex args...>]
-
-Initializes the current directory with public Obsidian AI Memory templates
-when they are missing, then starts Codex with this directory as workspace.
-
-Options:
-  --lang en|ru       Choose template language. Default: en.
-  --cloud-root DIR   Store AI Memory in DIR/PROJECT/AI Memory and link it into the project.
-  --project-name NAME
-                     Override the cloud folder name. Default: current directory name.
-  --auto-write-memory
-                     Allow the agent to update AI Memory without asking for per-write confirmation.
-                     This is unsafe and requires an interactive warning confirmation.
-  --init-only        Initialize memory files and exit without starting Codex.
-  --no-start         Same as --init-only.
-  --help             Show this help.
-
-Environment:
-  CODEX_MEMORY_TEMPLATE_ROOT  Override template root.
-  CODEX_MEMORY_LANG           Default template language: en or ru.
-  CODEX_MEMORY_CLOUD_ROOT     Default cloud root for shared project memory.
-USAGE
-}
-
-init_only=0
-lang="${CODEX_MEMORY_LANG:-en}"
-cloud_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
-project_name="${CODEX_MEMORY_PROJECT_NAME:-${TARGET_ROOT:t}}"
-auto_write_memory=0
-codex_args=()
-
-while (($#)); do
-  case "$1" in
-    --help|-h)
-      usage
-      exit 0
-      ;;
-    --init-only|--no-start)
-      init_only=1
-      shift
-      ;;
-    --lang)
-      if (($# < 2)); then
-        print -u2 "codex-project: --lang requires en or ru"
-        exit 1
-      fi
-      lang="$2"
-      shift 2
-      ;;
-    --lang=*)
-      lang="${1#--lang=}"
-      shift
-      ;;
-    --cloud-root)
-      if (($# < 2)); then
-        print -u2 "codex-project: --cloud-root requires a directory"
-        exit 1
-      fi
-      cloud_root="$2"
-      shift 2
-      ;;
-    --cloud-root=*)
-      cloud_root="${1#--cloud-root=}"
-      shift
-      ;;
-    --project-name)
-      if (($# < 2)); then
-        print -u2 "codex-project: --project-name requires a name"
-        exit 1
-      fi
-      project_name="$2"
-      shift 2
-      ;;
-    --project-name=*)
-      project_name="${1#--project-name=}"
-      shift
-      ;;
-    --auto-write-memory)
-      auto_write_memory=1
-      shift
-      ;;
-    --)
-      shift
-      codex_args+=("$@")
-      break
-      ;;
-    *)
-      codex_args+=("$1")
-      shift
-      ;;
-  esac
-done
-
-case "$lang" in
-  en|ru) ;;
-  *)
-    print -u2 "codex-project: unsupported language: $lang"
-    print -u2 "Supported languages: en, ru"
-    exit 1
-    ;;
-esac
-
-if [[ -z "$TEMPLATE_ROOT" ]]; then
-  print -u2 "codex-project: template root not found."
-  print -u2 "Run from a cloned ai-memory-public repo, install via ./install.sh, or set CODEX_MEMORY_TEMPLATE_ROOT."
-  exit 1
-fi
-
-if [[ "$lang" == "ru" ]]; then
-  TEMPLATE_MEMORY="$TEMPLATE_ROOT/locales/ru/templates/AI Memory"
-  TEMPLATE_AGENTS="$TEMPLATE_ROOT/locales/ru/AGENTS.md"
-else
-  TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
-  TEMPLATE_AGENTS="$TEMPLATE_ROOT/AGENTS.md"
-fi
-
-if [[ ! -d "$TEMPLATE_MEMORY" ]]; then
-  print -u2 "codex-project: template directory not found: $TEMPLATE_MEMORY"
-  exit 1
-fi
-
-if [[ ! -f "$TEMPLATE_AGENTS" ]]; then
-  print -u2 "codex-project: template AGENTS.md not found: $TEMPLATE_AGENTS"
-  exit 1
-fi
-
+typeset -a created
+typeset -a skipped
+typeset -a warnings
 created=()
 skipped=()
 warnings=()
-cloud_memory=""
-mirror_to_cloud=0
 
-confirm_auto_write_memory() {
-  local required="ENABLE AUTO MEMORY WRITE"
-  local answer=""
+doctor_mode=0
+lint_mode=0
+save_mode=0
+init_only=0
+override_agents=0
+remotely_save=0
+auto_write_memory=0
+lang="${CODEX_MEMORY_LANG:-en}"
+cloud_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
+project_name="${CODEX_MEMORY_PROJECT_NAME:-${TARGET_ROOT:t}}"
+save_title=""
+save_note=""
+codex_args=()
 
-  if command -v osascript >/dev/null 2>&1; then
-    osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
-display dialog "Auto-write memory mode lets the agent modify AI Memory files without asking before each write. Use it only in trusted projects. Secrets must never be stored." buttons {"Cancel", "Continue"} default button "Cancel" with icon caution
-APPLESCRIPT
+die() {
+  print -u2 -r -- "codex-project: $1"
+  exit 1
+}
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  codex-project [options] [-- <codex args...>]
+  codex-project doctor
+  codex-project lint
+  codex-project save [--title TITLE] [--note TEXT]
+
+Initializes the current directory with the AI memory scaffold and then starts
+Codex with this directory as the workspace.
+
+Options:
+  --help, -h
+      Show this help.
+  --init-only, --no-start
+      Initialize files and exit without starting Codex.
+  --lang en|ru
+      Choose template language. Default: en.
+  --cloud-root DIR
+      Store AI Memory under DIR/PROJECT/AI Memory and link it into the project.
+  --project-name NAME
+      Override the cloud folder name. Default: current directory name.
+  --override
+      Create AGENTS.override.md instead of AGENTS.md.
+  --remotely-save
+      Add safe Obsidian Remotely Save documentation files.
+  --auto-write-memory
+      Enable unsafe autonomous writes to AI Memory after warning confirmation.
+  --unsafe-auto-write-memory
+      Alias for --auto-write-memory.
+  save
+      Append a short session summary to AI Memory/session-summaries.md.
+  lint
+      Run the same project health checks as doctor.
+
+Environment:
+  CODEX_MEMORY_TEMPLATE_ROOT
+      Path to the repository root that contains templates/AI Memory/.
+  CODEX_MEMORY_LANG
+      Default template language: en or ru.
+  CODEX_MEMORY_CLOUD_ROOT
+      Default cloud root for shared AI Memory.
+  CODEX_MEMORY_PROJECT_NAME
+      Default project folder name for cloud-root mode.
+
+Passthrough:
+  Arguments after -- are forwarded to codex unchanged.
+
+Examples:
+  codex-project -- --model gpt-5.1
+  codex-project -- --ask-for-approval on-request
+  codex-project -- --sandbox workspace-write
+  codex-project -- --search
+  codex-project save --title "checkpoint" --note "Verified smoke-test passed"
+USAGE
+}
+
+resolve_template_root() {
+  if [[ -n "${CODEX_MEMORY_TEMPLATE_ROOT:-}" ]]; then
+    print -r -- "${CODEX_MEMORY_TEMPLATE_ROOT:A}"
+    return 0
   fi
 
-  print ""
-  print "WARNING: --auto-write-memory enables autonomous writes to AI Memory."
-  print "The agent may update memory files without per-write confirmation."
-  print "Risks: noisy memory, wrong durable facts, accidental persistence of sensitive context."
-  print "Safeguards remain: no secrets, append-only preference, duplicate/conflict checks, log updates, no git commits."
-  print ""
-  print "Type exactly '$required' to enable it for this project:"
-
-  if ! read -r answer; then
-    print -u2 "codex-project: auto-write-memory confirmation failed."
-    exit 1
+  if [[ -d "$REPO_ROOT/templates/AI Memory" ]]; then
+    print -r -- "$REPO_ROOT"
+    return 0
   fi
 
-  if [[ "$answer" != "$required" ]]; then
-    print -u2 "codex-project: auto-write-memory was not enabled."
-    exit 1
+  print -r -- ""
+}
+
+copy_template_file() {
+  local src="$1"
+  local dest="$2"
+  local label="$3"
+
+  [[ -f "$src" ]] || die "template file not found: $src"
+
+  if [[ -e "$dest" ]]; then
+    skipped+=("$label")
+    return 0
   fi
+
+  mkdir -p "${dest:h}"
+  sed "s/YYYY-MM-DD/$TODAY/g" "$src" > "$dest" || die "failed to write $dest"
+  created+=("$label")
 }
 
 append_auto_write_rules() {
   local agents_file="$1"
   local mode_lang="$2"
 
-  if rg -q '^## Autonomous Memory Write Mode$|^## Автономная запись в память$' "$agents_file" 2>/dev/null; then
-    skipped+=("AGENTS.md autonomous memory write rules")
-    return
+  if grep -Eq '^(## Autonomous Memory Write Mode|## Автономная запись в память)$' "$agents_file"; then
+    skipped+=("${agents_file:t} auto-write rules")
+    return 0
   fi
 
   if [[ "$mode_lang" == "ru" ]]; then
@@ -261,93 +202,544 @@ Git commit and push are still forbidden unless the user explicitly asks for them
 RULES
   fi
 
-  created+=("AGENTS.md autonomous memory write rules")
+  created+=("${agents_file:t} auto-write rules")
 }
 
-if [[ -e "$TARGET_ROOT/AGENTS.md" ]]; then
-  skipped+=("AGENTS.md")
+ensure_gitignore_block() {
+  local file="$1"
+  local header="# AI memory scaffold"
+  local -a required
+  local -a missing
+  local tmp
+  local inserted=0
+  local line
+  required=("AI Memory/" "AI Memory/**" "*.memory.local.md")
+  missing=()
+
+  if [[ ! -f "$file" ]]; then
+    {
+      print -r -- "$header"
+      for line in "${required[@]}"; do
+        print -r -- "$line"
+      done
+    } > "$file"
+    created+=(".gitignore AI memory block")
+    return 0
+  fi
+
+  for line in "${required[@]}"; do
+    if ! grep -Fxq -- "$line" "$file"; then
+      missing+=("$line")
+    fi
+  done
+
+  if (( ${#missing[@]} == 0 )); then
+    return 0
+  fi
+
+  tmp="$(mktemp "${TMPDIR:-/tmp}/codex-project-gitignore.XXXXXX")" || die "unable to create temporary file"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    print -r -- "$line" >> "$tmp"
+    if (( ! inserted )) && [[ "$line" == "$header" ]]; then
+      for line in "${missing[@]}"; do
+        print -r -- "$line" >> "$tmp"
+      done
+      inserted=1
+    fi
+  done < "$file"
+
+  if (( ! inserted )); then
+    {
+      print -r -- ""
+      print -r -- "$header"
+      for line in "${missing[@]}"; do
+        print -r -- "$line"
+      done
+    } >> "$tmp"
+  fi
+
+  mv "$tmp" "$file"
+  created+=(".gitignore AI memory block updated")
+}
+
+ensure_remotely_save_docs() {
+  local docs_dir="$TARGET_ROOT/docs"
+  local docs_file="$docs_dir/remotely-save.md"
+
+  mkdir -p "$docs_dir"
+
+  if [[ -e "$docs_file" ]]; then
+    skipped+=("docs/remotely-save.md")
+    return 0
+  fi
+
+  cat > "$docs_file" <<'DOCS'
+# Remotely Save Support
+
+Obsidian Remotely Save can sync vault files across devices, but the sync scope
+should be an explicit choice.
+
+## Safe layouts
+
+### Layout A: Full Obsidian vault sync
+
+- The project directory lives inside an Obsidian vault.
+- Remotely Save syncs the vault.
+- `AI Memory/` syncs like normal markdown notes.
+- Best when the same memory should be available on multiple devices.
+
+### Layout B: Cloud AI Memory folder
+
+- `AI Memory/` is a symlink to a cloud-synced folder.
+- Remotely Save syncs the Obsidian vault.
+- Codex reads memory through the symlink.
+- Best when the code repository and Obsidian vault are separate.
+
+### Layout C: No Obsidian config sync
+
+- Only markdown memory files are synced.
+- `.obsidian/` and Remotely Save credentials stay local.
+- This is the safest default.
+
+## Safety notes
+
+- Do not generate credential files here.
+- Do not commit private plugin config or secrets.
+- `.obsidian/` is hidden and may not be synced by default.
+- Decide explicitly whether to sync the whole vault.
+
+## Recommended workflow
+
+1. Initialize the normal memory scaffold.
+2. Choose the sync layout deliberately.
+3. Keep credentials out of `AI Memory/`.
+4. Verify what will sync before enabling the plugin.
+DOCS
+
+  created+=("docs/remotely-save.md")
+}
+
+append_session_summary() {
+  local summary_file="$TARGET_ROOT/AI Memory/session-summaries.md"
+  local timestamp
+  local entry_title
+  local entry_note
+  local title_prefix
+
+  [[ -d "$TARGET_ROOT/AI Memory" ]] || die "AI Memory directory is missing; run codex-project --init-only first"
+
+  if [[ ! -f "$summary_file" ]]; then
+    if [[ -f "$TEMPLATE_MEMORY/session-summaries.md" ]]; then
+      copy_template_file "$TEMPLATE_MEMORY/session-summaries.md" "$summary_file" "AI Memory/session-summaries.md"
+    else
+      die "session-summaries template is missing"
+    fi
+  fi
+
+  if [[ -z "$save_note" ]]; then
+    if [[ -t 0 ]]; then
+      print -r -- "Enter a short session summary, then press Enter:"
+      if ! read -r save_note; then
+        die "no session summary provided"
+      fi
+    else
+      save_note="$(cat)"
+    fi
+  fi
+
+  [[ -n "$save_note" ]] || die "no session summary provided"
+
+  timestamp="$(date '+%Y-%m-%d %H:%M')"
+  entry_title="${save_title:-Session Summary}"
+  title_prefix="## $timestamp - $entry_title"
+
+  {
+    print -r -- ""
+    print -r -- "$title_prefix"
+    print -r -- ""
+    print -r -- "- $save_note"
+  } >> "$summary_file"
+
+  created+=("AI Memory/session-summaries.md entry")
+}
+
+doctor_report() {
+  local hard_fail=0
+  local agents_file=""
+  local memory_dir="$TARGET_ROOT/AI Memory"
+  local git_root=""
+  local cloud_check_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
+
+  if command -v zsh >/dev/null 2>&1; then
+    print -r -- "OK: zsh found at $(command -v zsh)"
+  else
+    print -r -- "ERROR: zsh is not available in PATH"
+    hard_fail=1
+  fi
+
+  if command -v codex >/dev/null 2>&1; then
+    print -r -- "OK: codex found at $(command -v codex)"
+  else
+    print -r -- "ERROR: codex is not available in PATH"
+    hard_fail=1
+  fi
+
+  if [[ -n "$TEMPLATE_ROOT" && -d "$TEMPLATE_ROOT/templates/AI Memory" ]]; then
+    print -r -- "OK: template root resolved to $TEMPLATE_ROOT"
+  else
+    print -r -- "ERROR: template root not found. Set CODEX_MEMORY_TEMPLATE_ROOT to the repository root that contains templates/AI Memory."
+    hard_fail=1
+  fi
+
+  if [[ -w "$TARGET_ROOT" ]]; then
+    print -r -- "OK: current directory is writable"
+  else
+    print -r -- "ERROR: current directory is not writable"
+    hard_fail=1
+  fi
+
+  if [[ -f "$TARGET_ROOT/AGENTS.override.md" ]]; then
+    agents_file="$TARGET_ROOT/AGENTS.override.md"
+    print -r -- "OK: AGENTS.override.md exists"
+  elif [[ -f "$TARGET_ROOT/AGENTS.md" ]]; then
+    agents_file="$TARGET_ROOT/AGENTS.md"
+    print -r -- "OK: AGENTS.md exists"
+  else
+    print -r -- "ERROR: neither AGENTS.md nor AGENTS.override.md exists"
+    hard_fail=1
+  fi
+
+  if [[ -L "$memory_dir" ]]; then
+    print -r -- "OK: AI Memory is a symlink -> $(readlink "$memory_dir")"
+  elif [[ -d "$memory_dir" ]]; then
+    print -r -- "OK: AI Memory is a directory"
+  else
+    print -r -- "ERROR: AI Memory directory is missing"
+    hard_fail=1
+  fi
+
+  if [[ -f "$memory_dir/_index.md" ]]; then
+    print -r -- "OK: AI Memory/_index.md exists"
+  else
+    print -r -- "ERROR: AI Memory/_index.md is missing"
+    hard_fail=1
+  fi
+
+  if [[ -f "$memory_dir/_log.md" ]]; then
+    print -r -- "OK: AI Memory/_log.md exists"
+  else
+    print -r -- "ERROR: AI Memory/_log.md is missing"
+    hard_fail=1
+  fi
+
+  if [[ -f "$memory_dir/session-summaries.md" ]]; then
+    print -r -- "OK: AI Memory/session-summaries.md exists"
+  else
+    print -r -- "ERROR: AI Memory/session-summaries.md is missing"
+    hard_fail=1
+  fi
+
+  if command -v git >/dev/null 2>&1 && git -C "$TARGET_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git_root="$(git -C "$TARGET_ROOT" rev-parse --show-toplevel)"
+    if git -C "$TARGET_ROOT" check-ignore -q -- "AI Memory/_index.md" 2>/dev/null; then
+      print -r -- "OK: AI Memory is ignored by Git"
+    else
+      print -r -- "ERROR: AI Memory is not ignored by Git in $git_root"
+      hard_fail=1
+    fi
+  else
+    print -r -- "WARN: not inside a Git repository"
+  fi
+
+  if [[ -n "$cloud_check_root" ]]; then
+    cloud_check_root="${cloud_check_root:A}"
+    if [[ -d "$cloud_check_root" && -w "$cloud_check_root" ]]; then
+      print -r -- "OK: cloud root exists and is writable: $cloud_check_root"
+    else
+      print -r -- "ERROR: cloud root is missing or not writable: $cloud_check_root"
+      hard_fail=1
+    fi
+  fi
+
+  if [[ -f "$memory_dir/remotely-save.md" || -f "$TARGET_ROOT/docs/remotely-save.md" ]]; then
+    print -r -- "OK: Remotely Save support files present"
+  else
+    print -r -- "WARN: Remotely Save support files are not present"
+  fi
+
+  return "$hard_fail"
+}
+
+if [[ "${1:-}" == "doctor" ]]; then
+  doctor_mode=1
+  shift
+elif [[ "${1:-}" == "lint" ]]; then
+  lint_mode=1
+  shift
+elif [[ "${1:-}" == "save" ]]; then
+  save_mode=1
+  shift
+fi
+
+if (( doctor_mode || lint_mode )); then
+  if (($#)); then
+    case "${1:-}" in
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        die "doctor mode does not accept additional arguments"
+        ;;
+    esac
+  fi
+
+  TEMPLATE_ROOT="$(resolve_template_root)"
+  doctor_report
+  exit $?
+fi
+
+if (( save_mode )); then
+  while (($#)); do
+    case "$1" in
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      --title)
+        (($# < 2)) && die "--title requires a value"
+        save_title="$2"
+        shift 2
+        ;;
+      --title=*)
+        save_title="${1#--title=}"
+        shift
+        ;;
+      --note)
+        (($# < 2)) && die "--note requires text"
+        save_note="$2"
+        shift 2
+        ;;
+      --note=*)
+        save_note="${1#--note=}"
+        shift
+        ;;
+      --)
+        shift
+        if (($#)); then
+          save_note="${save_note}${save_note:+$'\n'}$*"
+        fi
+        break
+        ;;
+      *)
+        if [[ -z "$save_note" ]]; then
+          save_note="$1"
+        else
+          save_note="${save_note} $1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  TEMPLATE_ROOT="$(resolve_template_root)"
+  [[ -n "$TEMPLATE_ROOT" ]] || die "template root not found. Set CODEX_MEMORY_TEMPLATE_ROOT to the repository root that contains templates/AI Memory/."
+  TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
+  [[ -d "$TARGET_ROOT/AI Memory" ]] || die "AI Memory directory is missing; run codex-project --init-only first"
+  append_session_summary
+  print -r -- "codex-project: saved session summary"
+  exit 0
+fi
+
+while (($#)); do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --init-only|--no-start)
+      init_only=1
+      shift
+      ;;
+    --lang)
+      (($# < 2)) && die "--lang requires en or ru"
+      lang="$2"
+      shift 2
+      ;;
+    --lang=*)
+      lang="${1#--lang=}"
+      shift
+      ;;
+    --cloud-root)
+      (($# < 2)) && die "--cloud-root requires a directory"
+      cloud_root="$2"
+      shift 2
+      ;;
+    --cloud-root=*)
+      cloud_root="${1#--cloud-root=}"
+      shift
+      ;;
+    --project-name)
+      (($# < 2)) && die "--project-name requires a name"
+      project_name="$2"
+      shift 2
+      ;;
+    --project-name=*)
+      project_name="${1#--project-name=}"
+      shift
+      ;;
+    --override)
+      override_agents=1
+      shift
+      ;;
+    --remotely-save)
+      remotely_save=1
+      shift
+      ;;
+    --auto-write-memory|--unsafe-auto-write-memory)
+      auto_write_memory=1
+      shift
+      ;;
+    --)
+      shift
+      codex_args+=("$@")
+      break
+      ;;
+    *)
+      codex_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+case "$lang" in
+  en|ru) ;;
+  *)
+    die "unsupported language: $lang (supported: en, ru)"
+    ;;
+esac
+
+TEMPLATE_ROOT="$(resolve_template_root)"
+if [[ -z "$TEMPLATE_ROOT" ]]; then
+  die "template root not found. Set CODEX_MEMORY_TEMPLATE_ROOT to the repository root that contains templates/AI Memory/."
+fi
+
+if [[ "$lang" == "ru" ]]; then
+  TEMPLATE_MEMORY="$TEMPLATE_ROOT/locales/ru/templates/AI Memory"
+  TEMPLATE_AGENTS="$TEMPLATE_ROOT/locales/ru/AGENTS.md"
 else
-  cp "$TEMPLATE_AGENTS" "$TARGET_ROOT/AGENTS.md"
-  created+=("AGENTS.md")
+  TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
+  TEMPLATE_AGENTS="$TEMPLATE_ROOT/AGENTS.md"
+fi
+
+[[ -d "$TEMPLATE_MEMORY" ]] || die "template directory not found: $TEMPLATE_MEMORY"
+[[ -f "$TEMPLATE_AGENTS" ]] || die "template AGENTS.md not found: $TEMPLATE_AGENTS"
+
+agents_name="AGENTS.md"
+if (( override_agents )); then
+  agents_name="AGENTS.override.md"
+fi
+
+agents_target="$TARGET_ROOT/$agents_name"
+agents_created=0
+
+if [[ -e "$agents_target" ]]; then
+  skipped+=("$agents_name")
+else
+  copy_template_file "$TEMPLATE_AGENTS" "$agents_target" "$agents_name"
+  agents_created=1
 fi
 
 if (( auto_write_memory )); then
-  confirm_auto_write_memory
-  append_auto_write_rules "$TARGET_ROOT/AGENTS.md" "$lang"
+  if (( agents_created )); then
+    append_auto_write_rules "$agents_target" "$lang"
+  elif (( ! override_agents )); then
+    append_auto_write_rules "$agents_target" "$lang"
+  else
+    warnings+=("AGENTS.override.md already exists; left untouched")
+  fi
 fi
 
-MEMORY_DIR="$TARGET_ROOT/AI Memory"
+memory_dir="$TARGET_ROOT/AI Memory"
 
 if [[ -n "$cloud_root" ]]; then
   cloud_root="${cloud_root:A}"
   cloud_memory="$cloud_root/$project_name/AI Memory"
   mkdir -p "$cloud_memory"
 
-  if [[ -L "$MEMORY_DIR" ]]; then
-    current_target="$(readlink "$MEMORY_DIR")"
+  if [[ -L "$memory_dir" ]]; then
+    current_target="$(readlink "$memory_dir")"
     skipped+=("AI Memory symlink -> $current_target")
-  elif [[ -e "$MEMORY_DIR" ]]; then
+  elif [[ -e "$memory_dir" ]]; then
     warnings+=("AI Memory already exists as a regular file or directory; not replacing it with a cloud symlink.")
     warnings+=("A non-destructive copy will be mirrored to: $cloud_memory")
-    warnings+=("For ongoing cross-device sync, move or rename the local AI Memory directory, then rerun codex-project --cloud-root to link it.")
-    mirror_to_cloud=1
+    warnings+=("For ongoing cross-device sync, move or rename the local AI Memory directory, then rerun codex-project --cloud-root.")
   else
-    ln -s "$cloud_memory" "$MEMORY_DIR"
+    ln -s "$cloud_memory" "$memory_dir"
     created+=("AI Memory -> $cloud_memory")
-  fi
-
-  if [[ -L "$MEMORY_DIR" ]]; then
-    MEMORY_DIR="$cloud_memory"
-  elif [[ ! -e "$MEMORY_DIR" ]]; then
-    MEMORY_DIR="$cloud_memory"
   fi
 fi
 
-mkdir -p "$MEMORY_DIR"
+if [[ -L "$memory_dir" ]]; then
+  memory_target="$(readlink "$memory_dir")"
+  memory_copy_root="$memory_target"
+else
+  memory_copy_root="$memory_dir"
+fi
+
+mkdir -p "$memory_copy_root"
 
 for src in "$TEMPLATE_MEMORY"/*.md(N); do
   name="${src:t}"
-  dest="$MEMORY_DIR/$name"
-  if [[ -e "$dest" ]]; then
-    skipped+=("AI Memory/$name")
-    continue
-  fi
-
-  cp "$src" "$dest"
-  perl -pi -e "s/YYYY-MM-DD/$TODAY/g" "$dest"
-  created+=("AI Memory/$name")
+  dest="$memory_copy_root/$name"
+  label="AI Memory/$name"
+  copy_template_file "$src" "$dest" "$label"
 done
 
-if (( mirror_to_cloud )); then
-  rsync -a --ignore-existing "$MEMORY_DIR/" "$cloud_memory/"
-  created+=("cloud mirror -> $cloud_memory")
+if [[ -n "${cloud_memory:-}" && -d "$memory_dir" && ! -L "$memory_dir" ]]; then
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --ignore-existing "$memory_dir/" "$cloud_memory/"
+    created+=("cloud mirror -> $cloud_memory")
+  else
+    die "rsync is required to mirror existing AI Memory content into the cloud root"
+  fi
+fi
+
+ensure_gitignore_block "$TARGET_ROOT/.gitignore"
+
+if (( remotely_save )); then
+  ensure_remotely_save_docs
 fi
 
 if (( ${#created[@]} )); then
-  print "codex-project: created:"
+  print -r -- "codex-project: created:"
   for item in "${created[@]}"; do
-    print "  + $item"
+    print -r -- "  + $item"
   done
 else
-  print "codex-project: memory structure already exists."
+  print -r -- "codex-project: memory structure already exists."
 fi
 
 if (( ${#skipped[@]} )); then
-  print "codex-project: skipped existing files:"
+  print -r -- "codex-project: skipped existing files:"
   for item in "${skipped[@]}"; do
-    print "  = $item"
+    print -r -- "  = $item"
   done
 fi
 
 if (( ${#warnings[@]} )); then
-  print "codex-project: warnings:"
+  print -r -- "codex-project: warnings:"
   for item in "${warnings[@]}"; do
-    print "  ! $item"
+    print -r -- "  ! $item"
   done
 fi
 
 if (( init_only )); then
   exit 0
+fi
+
+if ! command -v codex >/dev/null 2>&1; then
+  die "codex is not available in PATH"
 fi
 
 exec codex -C "$TARGET_ROOT" "${codex_args[@]}"

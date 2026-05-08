@@ -160,3 +160,13 @@
 - Aliases: сессии, итоги, история, summary, продолжение
 - Priority: medium
 - Last updated: YYYY-MM-DD
+
+### remotely-save.md
+
+- Title: Remotely Save
+- Description: Безопасные заметки про Obsidian Remotely Save, облачную синхронизацию и раскладки памяти.
+- Read when: проект использует Remotely Save, синхронизацию vault, облако или symlink для AI Memory.
+- Categories: sync, remotely-save, obsidian, cloud
+- Aliases: remotely save, sync, vault sync, cloud sync, webdav, s3, dropbox, onedrive
+- Priority: medium
+- Last updated: YYYY-MM-DD

@@ -1,6 +1,9 @@
 .DS_Store
 .obsidian/
-/AI Memory/
+# AI memory scaffold
+AI Memory/
+AI Memory/**
+*.memory.local.md
 *.local.md
 *.secret.md
 .env

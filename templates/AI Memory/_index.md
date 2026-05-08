@@ -160,3 +160,13 @@ Use this section for coding and project work. Read `AI Memory/_index.md` first, 
 - Aliases: sessions, summaries, history, continuation
 - Priority: medium
 - Last updated: YYYY-MM-DD
+
+### remotely-save.md
+
+- Title: Remotely Save
+- Description: Safe notes about Obsidian Remotely Save, cloud sync layouts, and memory storage choices.
+- Read when: the project uses Remotely Save, vault sync, cloud sync, or symlinked AI Memory.
+- Categories: sync, remotely-save, obsidian, cloud
+- Aliases: remotely save, sync, vault sync, cloud sync, webdav, s3, dropbox, onedrive
+- Priority: medium
+- Last updated: YYYY-MM-DD
