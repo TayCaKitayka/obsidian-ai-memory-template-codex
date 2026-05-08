@@ -88,6 +88,16 @@ remote_dir="$(mktemp -d "${TMP_ROOT}/remote.XXXXXX")"
   check_file "$remote_dir/docs/remotely-save.md"
 )
 
+print -r -- "smoke-test: obsidian-root"
+vault_dir="$(mktemp -d "${TMP_ROOT}/vault.XXXXXX")"
+(
+  cd "$TMP_ROOT"
+  "$REPO_ROOT/bin/codex-project" --obsidian-root "$vault_dir" --project-name obsidian-test --init-only >/dev/null
+  check_file "$TMP_ROOT/AGENTS.md"
+  check_file "$vault_dir/obsidian-test/AI Memory/_index.md"
+  check_gitignore "$TMP_ROOT/.gitignore"
+)
+
 print -r -- "smoke-test: save"
 save_dir="$(mktemp -d "${TMP_ROOT}/save.XXXXXX")"
 (

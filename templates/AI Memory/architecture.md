@@ -14,3 +14,9 @@ Store project architecture, components, relationships, constraints, and importan
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[project-overview]]
+- [[commands]]
+- [[known-issues]]

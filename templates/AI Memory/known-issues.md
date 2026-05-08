@@ -14,3 +14,9 @@ Store known bugs, limitations, workarounds, risks, and troubleshooting context.
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[commands]]
+- [[architecture]]
+- [[tasks]]

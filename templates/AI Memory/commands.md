@@ -14,3 +14,9 @@ Store verified run, test, lint, build, verification, and maintenance commands.
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[dev-environment]]
+- [[architecture]]
+- [[known-issues]]

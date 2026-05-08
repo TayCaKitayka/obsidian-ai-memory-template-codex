@@ -14,3 +14,9 @@ Store durable tasks, plans, open questions, roadmap items, and follow-ups.
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[project-overview]]
+- [[architecture]]
+- [[session-summaries]]

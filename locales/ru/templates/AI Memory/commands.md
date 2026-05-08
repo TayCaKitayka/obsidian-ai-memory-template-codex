@@ -14,3 +14,9 @@ updated: YYYY-MM-DD
 
 ## Notes
 - Добавлять только устойчивую информацию, полезную для будущих AI coding sessions.
+
+## Связанные
+
+- [[dev-environment]]
+- [[architecture]]
+- [[known-issues]]

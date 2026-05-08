@@ -23,6 +23,7 @@ remotely_save=0
 auto_write_memory=0
 lang="${CODEX_MEMORY_LANG:-en}"
 cloud_root="${CODEX_MEMORY_CLOUD_ROOT:-}"
+obsidian_root="${CODEX_MEMORY_OBSIDIAN_ROOT:-${CODEX_MEMORY_VAULT_ROOT:-}}"
 project_name="${CODEX_MEMORY_PROJECT_NAME:-${TARGET_ROOT:t}}"
 save_title=""
 save_note=""
@@ -53,6 +54,10 @@ Options:
       Choose template language. Default: en.
   --cloud-root DIR
       Store AI Memory under DIR/PROJECT/AI Memory and link it into the project.
+  --obsidian-root DIR
+      Alias for --cloud-root DIR when the target is an Obsidian vault folder.
+  --vault-root DIR
+      Alias for --obsidian-root DIR.
   --project-name NAME
       Override the cloud folder name. Default: current directory name.
   --override
@@ -75,6 +80,10 @@ Environment:
       Default template language: en or ru.
   CODEX_MEMORY_CLOUD_ROOT
       Default cloud root for shared AI Memory.
+  CODEX_MEMORY_OBSIDIAN_ROOT
+      Default Obsidian vault root for shared AI Memory.
+  CODEX_MEMORY_VAULT_ROOT
+      Alias for CODEX_MEMORY_OBSIDIAN_ROOT.
   CODEX_MEMORY_PROJECT_NAME
       Default project folder name for cloud-root mode.
 
@@ -579,6 +588,24 @@ while (($#)); do
       cloud_root="${1#--cloud-root=}"
       shift
       ;;
+    --obsidian-root)
+      (($# < 2)) && die "--obsidian-root requires a directory"
+      obsidian_root="$2"
+      shift 2
+      ;;
+    --obsidian-root=*)
+      obsidian_root="${1#--obsidian-root=}"
+      shift
+      ;;
+    --vault-root)
+      (($# < 2)) && die "--vault-root requires a directory"
+      obsidian_root="$2"
+      shift 2
+      ;;
+    --vault-root=*)
+      obsidian_root="${1#--vault-root=}"
+      shift
+      ;;
     --project-name)
       (($# < 2)) && die "--project-name requires a name"
       project_name="$2"
@@ -618,6 +645,10 @@ case "$lang" in
     die "unsupported language: $lang (supported: en, ru)"
     ;;
 esac
+
+if [[ -n "$obsidian_root" && -z "$cloud_root" ]]; then
+  cloud_root="$obsidian_root"
+fi
 
 TEMPLATE_ROOT="$(resolve_template_root)"
 if [[ -z "$TEMPLATE_ROOT" ]]; then

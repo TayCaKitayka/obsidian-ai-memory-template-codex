@@ -14,3 +14,9 @@ Store project purpose, scope, goals, and durable context for future AI coding se
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[architecture]]
+- [[tasks]]
+- [[commands]]

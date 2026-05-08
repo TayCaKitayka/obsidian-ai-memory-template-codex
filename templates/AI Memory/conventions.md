@@ -14,3 +14,9 @@ Store project conventions: coding style, file structure, naming, formatting, and
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[project-overview]]
+- [[architecture]]
+- [[commands]]

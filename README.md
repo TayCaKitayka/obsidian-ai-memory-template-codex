@@ -123,15 +123,25 @@ The scaffold creates a small set of markdown files under `AI Memory/`:
 - optional `remotely-save.md`
 
 The memory index is the routing map for long-term memory.
+The graph stays small, but it becomes more useful when related notes link to each other:
+`[[project-overview]]`, `[[architecture]]`, `[[commands]]`, `[[tasks]]`, and `[[session-summaries]]`.
 
 ## Cloud / Symlink Workflow
 
 `codex-project --cloud-root DIR` stores `AI Memory/` in a shared cloud folder and links it back into the project when possible.
 
+If the directory is an Obsidian vault, use `--obsidian-root` instead. It is the same mechanism with a more explicit name.
+
 Example:
 
 ```bash
 codex-project --cloud-root "$HOME/Cloud/AI Memory Projects"
+```
+
+Obsidian vault example:
+
+```bash
+codex-project --obsidian-root "$HOME/Obsidian/MyVault"
 ```
 
 You can also set a default cloud root:

@@ -22,6 +22,7 @@ print -r -- "Add Remotely Save docs: codex-project --remotely-save"
 print -r -- "Save a session summary: codex-project save --title checkpoint --note '...'"
 print -r -- "Run the repo health check: codex-project doctor"
 print -r -- "Run the shorter health check: codex-project lint"
+print -r -- "Store memory in an Obsidian vault: codex-project --obsidian-root /path/to/vault"
 print -r -- "Use cloud memory: codex-project --cloud-root /path/to/cloud/AI-Memory"
 print -r -- "Enable autonomous memory writes: codex-project --auto-write-memory"
 

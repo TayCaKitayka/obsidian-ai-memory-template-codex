@@ -14,3 +14,9 @@ Store concise summaries of substantial AI coding sessions when useful for future
 
 ## Notes
 - Add only durable information useful for future AI coding sessions.
+
+## Related
+
+- [[commands]]
+- [[tasks]]
+- [[architecture]]
