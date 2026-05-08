@@ -17,6 +17,7 @@ updated: YYYY-MM-DD
 
 ## Связанные
 
+- [[map]]
 - [[commands]]
 - [[architecture]]
 - [[tasks]]

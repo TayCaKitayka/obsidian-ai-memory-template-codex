@@ -55,6 +55,7 @@ init_dir="$(mktemp -d "${TMP_ROOT}/init.XXXXXX")"
   git init -q
   check_file "$init_dir/AGENTS.md"
   check_file "$init_dir/AI Memory/_index.md"
+  check_file "$init_dir/AI Memory/map.md"
   check_gitignore "$init_dir/.gitignore"
   check_gitignored "$init_dir"
 )
@@ -95,6 +96,7 @@ vault_dir="$(mktemp -d "${TMP_ROOT}/vault.XXXXXX")"
   "$REPO_ROOT/bin/codex-project" --obsidian-root "$vault_dir" --project-name obsidian-test --init-only >/dev/null
   check_file "$TMP_ROOT/AGENTS.md"
   check_file "$vault_dir/obsidian-test/AI Memory/_index.md"
+  check_file "$vault_dir/obsidian-test/AI Memory/map.md"
   check_gitignore "$TMP_ROOT/.gitignore"
 )
 

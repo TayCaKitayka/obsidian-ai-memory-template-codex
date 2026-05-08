@@ -17,6 +17,7 @@ Store known bugs, limitations, workarounds, risks, and troubleshooting context.
 
 ## Related
 
+- [[map]]
 - [[commands]]
 - [[architecture]]
 - [[tasks]]

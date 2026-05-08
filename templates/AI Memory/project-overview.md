@@ -17,6 +17,7 @@ Store project purpose, scope, goals, and durable context for future AI coding se
 
 ## Related
 
+- [[map]]
 - [[architecture]]
 - [[tasks]]
 - [[commands]]

@@ -17,6 +17,7 @@ Store project architecture, components, relationships, constraints, and importan
 
 ## Related
 
+- [[map]]
 - [[project-overview]]
 - [[commands]]
 - [[known-issues]]

@@ -161,6 +161,16 @@ Use this section for coding and project work. Read `AI Memory/_index.md` first, 
 - Priority: medium
 - Last updated: YYYY-MM-DD
 
+### map.md
+
+- Title: Map
+- Description: Lightweight hub page with links to the most useful memory notes and graph entry points.
+- Read when: you want a quick overview of the memory layout or a central note to open in Obsidian.
+- Categories: hub, map, overview, navigation
+- Aliases: map, hub, index, navigation
+- Priority: medium
+- Last updated: YYYY-MM-DD
+
 ### remotely-save.md
 
 - Title: Remotely Save

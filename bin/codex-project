@@ -448,6 +448,13 @@ doctor_report() {
     hard_fail=1
   fi
 
+  if [[ -f "$memory_dir/map.md" ]]; then
+    print -r -- "OK: AI Memory/map.md exists"
+  else
+    print -r -- "ERROR: AI Memory/map.md is missing"
+    hard_fail=1
+  fi
+
   if command -v git >/dev/null 2>&1 && git -C "$TARGET_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git_root="$(git -C "$TARGET_ROOT" rev-parse --show-toplevel)"
     if git -C "$TARGET_ROOT" check-ignore -q -- "AI Memory/_index.md" 2>/dev/null; then

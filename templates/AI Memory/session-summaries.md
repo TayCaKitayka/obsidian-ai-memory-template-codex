@@ -17,6 +17,7 @@ Store concise summaries of substantial AI coding sessions when useful for future
 
 ## Related
 
+- [[map]]
 - [[commands]]
 - [[tasks]]
 - [[architecture]]

@@ -17,6 +17,7 @@ updated: YYYY-MM-DD
 
 ## Связанные
 
+- [[map]]
 - [[dev-environment]]
 - [[architecture]]
 - [[known-issues]]

@@ -124,7 +124,9 @@ The scaffold creates a small set of markdown files under `AI Memory/`:
 
 The memory index is the routing map for long-term memory.
 The graph stays small, but it becomes more useful when related notes link to each other:
-`[[project-overview]]`, `[[architecture]]`, `[[commands]]`, `[[tasks]]`, and `[[session-summaries]]`.
+`[[map]]`, `[[project-overview]]`, `[[architecture]]`, `[[commands]]`, `[[tasks]]`, and `[[session-summaries]]`.
+
+Open `AI Memory/map.md` in Obsidian for a compact hub view.
 
 ## Cloud / Symlink Workflow
 

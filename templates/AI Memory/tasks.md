@@ -17,6 +17,7 @@ Store durable tasks, plans, open questions, roadmap items, and follow-ups.
 
 ## Related
 
+- [[map]]
 - [[project-overview]]
 - [[architecture]]
 - [[session-summaries]]

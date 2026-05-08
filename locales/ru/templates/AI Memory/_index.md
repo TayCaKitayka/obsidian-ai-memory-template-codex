@@ -161,6 +161,16 @@
 - Priority: medium
 - Last updated: YYYY-MM-DD
 
+### map.md
+
+- Title: Карта
+- Description: Лёгкая hub-страница со ссылками на самые полезные заметки памяти и точки входа графа.
+- Read when: нужен быстрый обзор структуры памяти или центральная заметка для открытия в Obsidian.
+- Categories: hub, map, overview, navigation
+- Aliases: map, hub, index, navigation
+- Priority: medium
+- Last updated: YYYY-MM-DD
+
 ### remotely-save.md
 
 - Title: Remotely Save
