@@ -1031,7 +1031,9 @@ if (( code_note_mode )); then
   else
     copy_template_file "$TEMPLATE_CODE_NOTE" "$code_note_target" "${code_note_target:t}"
     if [[ -n "$code_note_title" ]]; then
-      sed -i '' "s/^# Code Note$/# $code_note_title/" "$code_note_target"
+      tmp_note="$(mktemp "${TMPDIR:-/tmp}/codex-project-code-note.XXXXXX")" || die "unable to create temporary file"
+      sed "s/^# Code Note$/# $code_note_title/" "$code_note_target" > "$tmp_note" || die "failed to rewrite code note title"
+      mv "$tmp_note" "$code_note_target"
     fi
     if [[ -e "$TARGET_ROOT/map.md" ]]; then
       {
