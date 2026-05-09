@@ -7,6 +7,7 @@ It stays small, explicit, and safe.
 
 - A reusable scaffold for `AGENTS.md`, `AGENTS.override.md`, and `AI Memory/` templates.
 - A helper command for initializing memory in a project and launching Codex.
+- Windows launcher scripts for running the same zsh core through WSL.
 - A safe documentation set for Obsidian Remotely Save workflows.
 
 ## Why This Exists
@@ -45,8 +46,10 @@ Clone this repository and run:
 ```
 
 The installer symlinks `bin/codex-project` into `~/.local/bin`.
+On Windows, use `bin/codex-project.cmd` or `bin/codex-project.ps1` with WSL installed.
 
 If you move the repository later, rerun `./install.sh` so the symlink points at the current clone.
+Windows users do not use `install.sh`; they should run the launchers from the repository root or add the repo to PATH in a Windows-friendly way.
 
 ## Usage
 

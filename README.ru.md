@@ -7,6 +7,7 @@
 
 - Базовый шаблон для `AGENTS.md`, `AGENTS.override.md` и `AI Memory/`.
 - Команда для инициализации памяти в проекте и запуска Codex.
+- Windows launcher-скрипты для запуска того же zsh-core через WSL.
 - Безопасная документация для сценариев Obsidian Remotely Save.
 
 ## Зачем Это Нужно
@@ -45,8 +46,10 @@ export PATH="$HOME/.local/bin:$PATH"
 ```
 
 Установщик создаёт симлинк `bin/codex-project` в `~/.local/bin`.
+На Windows используй `bin/codex-project.cmd` или `bin/codex-project.ps1` при установленном WSL.
 
 Если потом перенесёшь репозиторий, снова запусти `./install.sh`, чтобы симлинк указывал на актуальную копию.
+Пользователям Windows не нужен `install.sh`; им стоит запускать launcher-скрипты из корня репозитория или добавить репозиторий в PATH удобным для Windows способом.
 
 ## Использование
 
