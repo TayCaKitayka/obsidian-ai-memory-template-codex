@@ -61,8 +61,9 @@ codex-project
 
 This will:
 
-- create `AGENTS.md` or `AGENTS.override.md`;
-- create `AI Memory/` and copy the memory templates;
+- create `.codex-project/` and store the real project files there;
+- create `AGENTS.md` or `AGENTS.override.md` as symlinks into `.codex-project/`;
+- create `AI Memory/` as a symlink into `.codex-project/`;
 - replace `YYYY-MM-DD` with today's date;
 - keep existing files instead of overwriting them;
 - update `.gitignore` with safe AI memory ignore rules;
@@ -155,6 +156,7 @@ Open `AI Memory/map.md` in Obsidian for a compact hub view.
 For multi-project vaults, keep a top-level map note that briefly describes each project and links to each project map or project overview note.
 The repository now includes `templates/vault-map.md` as a starting point for that vault-root note.
 If you already have a vault and only want the top-level note, run `codex-project vault-map` from the vault root.
+When `--obsidian-root` is used, that top-level note is created in the vault root itself.
 
 When AI generates code, create a short `.md` note beside it that captures the code's purpose, constraints, and notable implementation quirks.
 If you want that note automatically, run `codex-project code-note` in the project directory. Use `--title` to name the note and `--source` to place it beside a source file. `codex-project note` is a shorter alias.

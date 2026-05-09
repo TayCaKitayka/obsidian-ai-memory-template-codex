@@ -41,7 +41,8 @@ check_gitignore() {
 
 check_gitignored() {
   local dir="$1"
-  git -C "$dir" check-ignore -q -- "AI Memory/_index.md"
+  [[ -L "$dir/AI Memory" ]]
+  check_gitignore "$dir/.gitignore"
 }
 
 print -r -- "smoke-test: syntax checks"
@@ -61,6 +62,24 @@ init_dir="$(mktemp -d "${TMP_ROOT}/init.XXXXXX")"
   check_file "$init_dir/AI Memory/map.md"
   check_gitignore "$init_dir/.gitignore"
   check_gitignored "$init_dir"
+  check_file "$init_dir/.codex-project/AGENTS.md"
+  check_file "$init_dir/.codex-project/AI Memory/_index.md"
+)
+
+print -r -- "smoke-test: migrate"
+migrate_dir="$(mktemp -d "${TMP_ROOT}/migrate.XXXXXX")"
+(
+  export HOME="$SANDBOX_HOME"
+  export XDG_CONFIG_HOME="$HOME/.config"
+  cd "$migrate_dir"
+  mkdir -p "AI Memory"
+  cp "$REPO_ROOT/templates/AI Memory/_index.md" "AI Memory/_index.md"
+  cp "$REPO_ROOT/AGENTS.md" "AGENTS.md"
+  "$REPO_ROOT/bin/codex-project" --init-only >/dev/null
+  check_file "$migrate_dir/.codex-project/AGENTS.md"
+  check_file "$migrate_dir/.codex-project/AI Memory/_index.md"
+  [[ -L "$migrate_dir/AGENTS.md" ]]
+  [[ -L "$migrate_dir/AI Memory" ]]
 )
 
 print -r -- "smoke-test: doctor"
@@ -73,6 +92,8 @@ doctor_dir="$(mktemp -d "${TMP_ROOT}/doctor.XXXXXX")"
   git init -q
   "$REPO_ROOT/bin/codex-project" doctor >/dev/null
   "$REPO_ROOT/bin/codex-project" lint >/dev/null
+  check_file "$doctor_dir/.codex-project/AGENTS.md"
+  check_file "$doctor_dir/.codex-project/AI Memory/_index.md"
 )
 
 print -r -- "smoke-test: override"
@@ -110,6 +131,7 @@ settings_vault="$(mktemp -d "${TMP_ROOT}/settings-vault.XXXXXX")"
   check_file "$settings_dir/AI Memory/map.md"
   check_file "$settings_dir/AI Memory/remotely-save.md"
   grep -Fq -- "CODEX_MEMORY_DEFAULT_VAULT_MAP" "$XDG_CONFIG_HOME/codex-project/settings.env"
+  check_file "$settings_vault/map.md"
   check_file "$settings_vault/settings/AI Memory/_index.md"
   check_file "$settings_vault/settings/AI Memory/map.md"
   check_file "$settings_vault/settings/AI Memory/remotely-save.md"
@@ -124,6 +146,7 @@ remote_dir="$(mktemp -d "${TMP_ROOT}/remote.XXXXXX")"
   "$REPO_ROOT/bin/codex-project" --remotely-save --init-only >/dev/null
   check_file "$remote_dir/AI Memory/remotely-save.md"
   check_file "$remote_dir/docs/remotely-save.md"
+  check_file "$remote_dir/.codex-project/AGENTS.md"
 )
 
 print -r -- "smoke-test: obsidian-root"
@@ -134,7 +157,7 @@ vault_dir="$(mktemp -d "${TMP_ROOT}/vault.XXXXXX")"
   cd "$TMP_ROOT"
   "$REPO_ROOT/bin/codex-project" --obsidian-root "$vault_dir" --project-name obsidian-test --init-only >/dev/null
   check_file "$TMP_ROOT/AGENTS.md"
-  check_file "$TMP_ROOT/map.md"
+  check_file "$vault_dir/map.md"
   check_file "$vault_dir/obsidian-test/AI Memory/_index.md"
   check_file "$vault_dir/obsidian-test/AI Memory/map.md"
   check_gitignore "$TMP_ROOT/.gitignore"

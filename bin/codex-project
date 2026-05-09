@@ -442,6 +442,78 @@ copy_template_file() {
   created+=("$label")
 }
 
+ensure_symlink() {
+  local target="$1"
+  local link_path="$2"
+
+  if [[ -L "$link_path" ]]; then
+    return 0
+  fi
+
+  if [[ -e "$link_path" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${link_path:h}"
+  ln -s "$target" "$link_path"
+}
+
+migrate_legacy_layout() {
+  local legacy_agents="$TARGET_ROOT/AGENTS.md"
+  local legacy_memory="$TARGET_ROOT/AI Memory"
+  local legacy_override="$TARGET_ROOT/AGENTS.override.md"
+  local store_dir="$TARGET_ROOT/.codex-project"
+  local store_agents="$store_dir/AGENTS.md"
+  local store_override="$store_dir/AGENTS.override.md"
+  local store_memory="$store_dir/AI Memory"
+  local root_memory_link="$TARGET_ROOT/AI Memory"
+  local migrated=0
+
+  if [[ -d "$store_dir" ]]; then
+    return 0
+  fi
+
+  if [[ ! -e "$legacy_agents" && ! -e "$legacy_memory" && ! -e "$legacy_override" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$store_dir"
+
+  if [[ -e "$legacy_agents" ]]; then
+    if [[ ! -e "$store_agents" ]]; then
+      mv "$legacy_agents" "$store_agents"
+      migrated=1
+    fi
+  fi
+
+  if [[ -e "$legacy_override" ]]; then
+    if [[ ! -e "$store_override" ]]; then
+      mv "$legacy_override" "$store_override"
+      migrated=1
+    fi
+  fi
+
+  if [[ -e "$legacy_memory" ]]; then
+    if [[ ! -e "$store_memory" ]]; then
+      mv "$legacy_memory" "$store_memory"
+      migrated=1
+    fi
+  fi
+
+  rm -f "$legacy_agents" "$legacy_override"
+  rm -rf "$legacy_memory"
+
+  ensure_symlink "$store_agents" "$legacy_agents"
+  ensure_symlink "$store_memory" "$legacy_memory"
+  if [[ -e "$store_override" || -L "$legacy_override" ]]; then
+    ensure_symlink "$store_override" "$legacy_override"
+  fi
+
+  if (( migrated )); then
+    created+=(".codex-project migrated")
+  fi
+}
+
 append_auto_write_rules() {
   local agents_file="$1"
   local mode_lang="$2"
@@ -775,7 +847,7 @@ doctor_report() {
 
   if command -v git >/dev/null 2>&1 && git -C "$TARGET_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git_root="$(git -C "$TARGET_ROOT" rev-parse --show-toplevel)"
-    if git -C "$TARGET_ROOT" check-ignore -q -- "AI Memory/_index.md" 2>/dev/null; then
+    if [[ -L "$memory_dir" ]] && [[ -f "$TARGET_ROOT/.gitignore" ]] && grep -Fxq -- "/AI Memory/" "$TARGET_ROOT/.gitignore"; then
       print -r -- "OK: AI Memory is ignored by Git"
     else
       print -r -- "ERROR: AI Memory is not ignored by Git in $git_root"
@@ -1180,6 +1252,7 @@ fi
 
 load_settings_file "$global_settings_file"
 load_settings_file "$local_settings_file"
+migrate_legacy_layout
 
 if (( ! lang_cli_set && ! env_lang_present )) && [[ -n "$settings_lang" ]]; then
   lang="$settings_lang"
@@ -1247,12 +1320,26 @@ fi
 
 agents_target="$TARGET_ROOT/$agents_name"
 agents_created=0
+project_store_dir="$TARGET_ROOT/.codex-project"
+store_agents_target="$project_store_dir/$agents_name"
+store_memory_dir="$project_store_dir/AI Memory"
 
-if [[ -e "$agents_target" ]]; then
-  skipped+=("$agents_name")
+if [[ -n "$cloud_root" || -n "$obsidian_root" ]]; then
+  if [[ -e "$agents_target" ]]; then
+    skipped+=("$agents_name")
+  else
+    copy_template_file "$TEMPLATE_AGENTS" "$agents_target" "$agents_name"
+    agents_created=1
+  fi
 else
-  copy_template_file "$TEMPLATE_AGENTS" "$agents_target" "$agents_name"
-  agents_created=1
+  mkdir -p "$project_store_dir"
+  if [[ -e "$store_agents_target" ]]; then
+    skipped+=("$agents_name")
+  else
+    copy_template_file "$TEMPLATE_AGENTS" "$store_agents_target" "$agents_name"
+    agents_created=1
+  fi
+  ensure_symlink "$store_agents_target" "$agents_target"
 fi
 
 if (( auto_write_memory )); then
@@ -1265,7 +1352,12 @@ if (( auto_write_memory )); then
   fi
 fi
 
-memory_dir="$TARGET_ROOT/AI Memory"
+if [[ -z "$cloud_root" && -z "$obsidian_root" ]]; then
+  memory_dir="$TARGET_ROOT/AI Memory"
+  ensure_symlink "$store_memory_dir" "$memory_dir"
+else
+  memory_dir="$TARGET_ROOT/AI Memory"
+fi
 
 if [[ -n "$cloud_root" ]]; then
   cloud_root="${cloud_root:A}"
@@ -1286,7 +1378,8 @@ if [[ -n "$cloud_root" ]]; then
 fi
 
 if [[ -n "$obsidian_root" ]]; then
-  vault_map_target="$TARGET_ROOT/map.md"
+  vault_map_root="${obsidian_root:A}"
+  vault_map_target="$vault_map_root/map.md"
   if [[ "$vault_map_default" != 0 ]]; then
     if [[ -e "$vault_map_target" ]]; then
       skipped+=("map.md")
@@ -1300,7 +1393,11 @@ if [[ -L "$memory_dir" ]]; then
   memory_target="$(readlink "$memory_dir")"
   memory_copy_root="$memory_target"
 else
-  memory_copy_root="$memory_dir"
+  if [[ -n "$cloud_root" || -n "$obsidian_root" ]]; then
+    memory_copy_root="$memory_dir"
+  else
+    memory_copy_root="$store_memory_dir"
+  fi
 fi
 
 mkdir -p "$memory_copy_root"
