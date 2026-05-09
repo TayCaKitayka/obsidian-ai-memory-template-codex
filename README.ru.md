@@ -76,6 +76,10 @@ codex-project --init-only
 ```bash
 codex-project doctor
 codex-project lint
+codex-project vault-map
+codex-project code-note --title "Моя Фича"
+codex-project code-note --source src/my-feature.ts
+codex-project note --source src/my-feature.ts
 codex-project save --title "checkpoint" --note "Smoke test passed"
 ```
 
@@ -144,6 +148,12 @@ codex-project -- --search
 `[[map]]`, `[[project-overview]]`, `[[architecture]]`, `[[commands]]`, `[[tasks]]`, `[[session-summaries]]`.
 
 Открой `AI Memory/map.md` в Obsidian, чтобы видеть компактную hub-страницу.
+Для vault с несколькими проектами держи верхнеуровневую карту, которая кратко описывает каждый проект и ссылается на его карту или проектную заметку.
+В репозитории теперь есть `templates/vault-map.md` как стартовый шаблон для такой vault-root заметки.
+Если vault уже существует и нужен только верхний `map.md`, запусти `codex-project vault-map` из корня vault.
+
+Когда AI генерирует код, рядом полезно создавать короткую `.md`-заметку с назначением кода, ограничениями и заметными особенностями реализации.
+Если нужна такая заметка автоматически, запусти `codex-project code-note` в директории проекта. Используй `--title`, чтобы задать название заметки, и `--source`, чтобы создать её рядом с исходником. `codex-project note` это короткий алиас.
 
 ## Работа С Obsidian Vault
 

@@ -76,6 +76,10 @@ Useful subcommands:
 ```bash
 codex-project doctor
 codex-project lint
+codex-project vault-map
+codex-project code-note --title "My Feature"
+codex-project code-note --source src/my-feature.ts
+codex-project note --source src/my-feature.ts
 codex-project save --title "checkpoint" --note "Smoke test passed"
 ```
 
@@ -144,6 +148,12 @@ The graph stays small, but it becomes more useful when related notes link to eac
 `[[map]]`, `[[project-overview]]`, `[[architecture]]`, `[[commands]]`, `[[tasks]]`, and `[[session-summaries]]`.
 
 Open `AI Memory/map.md` in Obsidian for a compact hub view.
+For multi-project vaults, keep a top-level map note that briefly describes each project and links to each project map or project overview note.
+The repository now includes `templates/vault-map.md` as a starting point for that vault-root note.
+If you already have a vault and only want the top-level note, run `codex-project vault-map` from the vault root.
+
+When AI generates code, create a short `.md` note beside it that captures the code's purpose, constraints, and notable implementation quirks.
+If you want that note automatically, run `codex-project code-note` in the project directory. Use `--title` to name the note and `--source` to place it beside a source file. `codex-project note` is a shorter alias.
 
 ## Obsidian Vault Workflow
 

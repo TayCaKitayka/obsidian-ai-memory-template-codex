@@ -10,6 +10,8 @@ If no relevant facts are found, say: `В памяти релевантных д�
 
 For coding and project work, read `AI Memory/_index.md` first, then read only the relevant project memory files such as `project-overview.md`, `architecture.md`, `dev-environment.md`, `commands.md`, `conventions.md`, `known-issues.md`, `tasks.md`, or `session-summaries.md`.
 
+For multi-project vaults, keep a top-level hub note at the vault root that briefly describes each project and links to each project map or project overview note.
+
 Do not scan the whole repository or vault by default.
 
 Do not modify memory during normal question answering.
@@ -83,6 +85,7 @@ Always preserve history.
 - известные проблемы, ограничения, workaround и риски
 - устойчивые задачи, roadmap items и follow-ups
 - краткие итоги существенных coding sessions
+- короткие markdown notes that summarize generated code, its purpose, and project-specific constraints or quirks
 
 Перед записью всё равно нужно:
 
@@ -95,6 +98,8 @@ Always preserve history.
 7. Добавить запись в `AI Memory/_log.md`.
 
 Нельзя автоматически сохранять секреты, токены, пароли, private keys, credentials, private URLs, лишние персональные данные, догадки, временный вывод терминала, одноразовые ошибки или низкоценный шум.
+
+When generating code, also write a short `.md` note that captures the code's purpose, notable constraints, and any important implementation quirks for future sessions.
 
 Если есть конфликт, риск секрета, сомнение в устойчивости факта или запись требует изменения файлов вне `AI Memory/`, нужно сначала спросить пользователя.
 

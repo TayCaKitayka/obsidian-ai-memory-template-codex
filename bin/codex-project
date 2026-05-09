@@ -17,6 +17,8 @@ warnings=()
 doctor_mode=0
 lint_mode=0
 save_mode=0
+vault_map_mode=0
+code_note_mode=0
 settings_mode=0
 init_only=0
 override_agents=0
@@ -79,6 +81,8 @@ Usage:
   codex-project doctor
   codex-project lint
   codex-project save [--title TITLE] [--note TEXT]
+  codex-project vault-map [--lang en|ru]
+  codex-project code-note [--file PATH] [--title TITLE] [--lang en|ru]
 
 Initializes the current directory with the AI memory scaffold and then starts
 Codex with this directory as the workspace.
@@ -116,6 +120,10 @@ Options:
       Append a short session summary to AI Memory/session-summaries.md.
   lint
       Run the same project health checks as doctor.
+  vault-map
+      Create a top-level vault map note in the current directory.
+  code-note
+      Create a short markdown note for generated code in the current directory.
 
 Environment:
   CODEX_MEMORY_TEMPLATE_ROOT
@@ -794,6 +802,15 @@ elif [[ "${1:-}" == "lint" ]]; then
 elif [[ "${1:-}" == "save" ]]; then
   save_mode=1
   shift
+elif [[ "${1:-}" == "vault-map" ]]; then
+  vault_map_mode=1
+  shift
+elif [[ "${1:-}" == "code-note" ]]; then
+  code_note_mode=1
+  shift
+elif [[ "${1:-}" == "note" ]]; then
+  code_note_mode=1
+  shift
 fi
 
 if (( doctor_mode || lint_mode )); then
@@ -863,6 +880,164 @@ if (( save_mode )); then
   [[ -d "$TARGET_ROOT/AI Memory" ]] || die "AI Memory directory is missing; run codex-project --init-only first"
   append_session_summary
   print -r -- "codex-project: saved session summary"
+  exit 0
+fi
+
+if (( vault_map_mode )); then
+  while (($#)); do
+    case "$1" in
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      --lang)
+        (($# < 2)) && die "--lang requires en or ru"
+        lang="$2"
+        lang_cli_set=1
+        shift 2
+        ;;
+      --lang=*)
+        lang="${1#--lang=}"
+        lang_cli_set=1
+        shift
+        ;;
+      --)
+        shift
+        [[ $# -eq 0 ]] || die "vault-map does not accept passthrough arguments"
+        break
+        ;;
+      *)
+        die "vault-map accepts only --lang and --help"
+        ;;
+    esac
+  done
+
+  case "$lang" in
+    en|ru) ;;
+    *)
+      die "unsupported language: $lang (supported: en, ru)"
+      ;;
+  esac
+
+  TEMPLATE_ROOT="$(resolve_template_root)"
+  [[ -n "$TEMPLATE_ROOT" ]] || die "template root not found. Set CODEX_MEMORY_TEMPLATE_ROOT to the repository root that contains templates/AI Memory/."
+  if [[ "$lang" == "ru" ]]; then
+    TEMPLATE_VAULT_MAP="$TEMPLATE_ROOT/locales/ru/templates/vault-map.md"
+  else
+    TEMPLATE_VAULT_MAP="$TEMPLATE_ROOT/templates/vault-map.md"
+  fi
+
+  vault_map_target="$TARGET_ROOT/map.md"
+  if [[ -e "$vault_map_target" ]]; then
+    print -r -- "codex-project: map.md already exists."
+  else
+    copy_template_file "$TEMPLATE_VAULT_MAP" "$vault_map_target" "map.md"
+    print -r -- "codex-project: created vault map note."
+  fi
+  exit 0
+fi
+
+if (( code_note_mode )); then
+  code_note_target="$TARGET_ROOT/code-note.md"
+  code_note_source=""
+  code_note_title=""
+  while (($#)); do
+    case "$1" in
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      --file)
+        (($# < 2)) && die "--file requires a path"
+        code_note_target="$2"
+        shift 2
+        ;;
+      --file=*)
+        code_note_target="${1#--file=}"
+        shift
+        ;;
+      --source)
+        (($# < 2)) && die "--source requires a path"
+        code_note_source="$2"
+        shift 2
+        ;;
+      --source=*)
+        code_note_source="${1#--source=}"
+        shift
+        ;;
+      --title)
+        (($# < 2)) && die "--title requires a value"
+        code_note_title="$2"
+        shift 2
+        ;;
+      --title=*)
+        code_note_title="${1#--title=}"
+        shift
+        ;;
+      --lang)
+        (($# < 2)) && die "--lang requires en or ru"
+        lang="$2"
+        lang_cli_set=1
+        shift 2
+        ;;
+      --lang=*)
+        lang="${1#--lang=}"
+        lang_cli_set=1
+        shift
+        ;;
+      --)
+        shift
+        [[ $# -eq 0 ]] || die "code-note does not accept passthrough arguments"
+        break
+        ;;
+      *)
+        die "code-note accepts only --file, --source, --title, --lang, and --help"
+        ;;
+    esac
+  done
+
+  case "$lang" in
+    en|ru) ;;
+    *)
+      die "unsupported language: $lang (supported: en, ru)"
+      ;;
+  esac
+
+  TEMPLATE_ROOT="$(resolve_template_root)"
+  [[ -n "$TEMPLATE_ROOT" ]] || die "template root not found. Set CODEX_MEMORY_TEMPLATE_ROOT to the repository root that contains templates/AI Memory/."
+  if [[ "$lang" == "ru" ]]; then
+    TEMPLATE_CODE_NOTE="$TEMPLATE_ROOT/locales/ru/templates/code-note.md"
+  else
+    TEMPLATE_CODE_NOTE="$TEMPLATE_ROOT/templates/code-note.md"
+  fi
+
+  if [[ -n "$code_note_source" && "$code_note_target" == "$TARGET_ROOT/code-note.md" ]]; then
+    code_note_target="${code_note_source:h}/${code_note_source:t:r}.code.md"
+  fi
+
+  if [[ -e "$code_note_target" ]]; then
+    print -r -- "codex-project: ${code_note_target:t} already exists."
+  else
+    copy_template_file "$TEMPLATE_CODE_NOTE" "$code_note_target" "${code_note_target:t}"
+    if [[ -n "$code_note_title" ]]; then
+      sed -i '' "s/^# Code Note$/# $code_note_title/" "$code_note_target"
+    fi
+    if [[ -e "$TARGET_ROOT/map.md" ]]; then
+      {
+        print -r -- ""
+        print -r -- "## Vault"
+        print -r -- "- [[map]]"
+      } >> "$code_note_target"
+    fi
+    if [[ -n "$code_note_source" ]]; then
+      {
+        print -r -- ""
+        print -r -- "## Source"
+        print -r -- "- \`$code_note_source\`"
+      } >> "$code_note_target"
+    fi
+    print -r -- "codex-project: created code note."
+  fi
   exit 0
 fi
 
@@ -1040,9 +1215,11 @@ fi
 if [[ "$lang" == "ru" ]]; then
   TEMPLATE_MEMORY="$TEMPLATE_ROOT/locales/ru/templates/AI Memory"
   TEMPLATE_AGENTS="$TEMPLATE_ROOT/locales/ru/AGENTS.md"
+  TEMPLATE_VAULT_MAP="$TEMPLATE_ROOT/locales/ru/templates/vault-map.md"
 else
   TEMPLATE_MEMORY="$TEMPLATE_ROOT/templates/AI Memory"
   TEMPLATE_AGENTS="$TEMPLATE_ROOT/AGENTS.md"
+  TEMPLATE_VAULT_MAP="$TEMPLATE_ROOT/templates/vault-map.md"
 fi
 
 [[ -d "$TEMPLATE_MEMORY" ]] || die "template directory not found: $TEMPLATE_MEMORY"
@@ -1090,6 +1267,15 @@ if [[ -n "$cloud_root" ]]; then
   else
     ln -s "$cloud_memory" "$memory_dir"
     created+=("AI Memory -> $cloud_memory")
+  fi
+fi
+
+if [[ -n "$obsidian_root" ]]; then
+  vault_map_target="$TARGET_ROOT/map.md"
+  if [[ -e "$vault_map_target" ]]; then
+    skipped+=("map.md")
+  else
+    copy_template_file "$TEMPLATE_VAULT_MAP" "$vault_map_target" "map.md"
   fi
 fi
 
