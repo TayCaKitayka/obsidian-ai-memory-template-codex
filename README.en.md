@@ -102,6 +102,7 @@ Use it for default values like:
 - `CODEX_MEMORY_PROJECT_NAME`
 - `CODEX_MEMORY_DEFAULT_REMOTELY_SAVE`
 - `CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY`
+- `CODEX_MEMORY_DEFAULT_VAULT_MAP`
 
 `codex-project` also accepts an optional local override file at `./.codex-project.env`, but the global file is the normal one.
 

@@ -48,6 +48,7 @@ settings_project_name=""
 settings_override_agents=""
 settings_remotely_save=""
 settings_auto_write_memory=""
+settings_vault_map=""
 env_lang_present=0
 env_cloud_root_present=0
 env_obsidian_root_present=0
@@ -254,6 +255,7 @@ run_settings_wizard() {
   local prompt_override
   local prompt_remotely
   local prompt_auto_write
+  local prompt_vault_map
   local lang_choice
   local override_choice
   local remotely_choice
@@ -276,12 +278,14 @@ run_settings_wizard() {
     prompt_override="Создавать AGENTS.override.md по умолчанию"
     prompt_remotely="Включить Remotely Save документацию по умолчанию"
     prompt_auto_write="Включить unsafe auto-write-memory по умолчанию"
+    prompt_vault_map="Автоматически создавать верхний map.md для Obsidian vault"
   else
     prompt_root_mode="Where should shared AI Memory live: 1) local only 2) Obsidian vault 3) cloud folder"
     prompt_root_path="Shared memory folder"
     prompt_override="Create AGENTS.override.md by default"
     prompt_remotely="Enable Remotely Save docs by default"
     prompt_auto_write="Enable unsafe auto-write-memory by default"
+    prompt_vault_map="Automatically create a top-level map.md for Obsidian vaults"
   fi
 
   root_mode_choice="$(wizard_prompt_text "$prompt_root_mode" "2")"
@@ -313,10 +317,12 @@ run_settings_wizard() {
   override_choice="$(wizard_prompt_yes_no "$prompt_override" "n")"
   remotely_choice="$(wizard_prompt_yes_no "$prompt_remotely" "y")"
   auto_write_choice="$(wizard_prompt_yes_no "$prompt_auto_write" "n")"
+  vault_map_choice="$(wizard_prompt_yes_no "$prompt_vault_map" "y")"
 
   settings_override_agents="$override_choice"
   settings_remotely_save="$remotely_choice"
   settings_auto_write_memory="$auto_write_choice"
+  settings_vault_map="$vault_map_choice"
   settings_project_name=""
 
   if [[ "$settings_lang" == "ru" ]]; then
@@ -374,6 +380,9 @@ load_settings_file() {
       CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY)
         settings_auto_write_memory="$value"
         ;;
+      CODEX_MEMORY_DEFAULT_VAULT_MAP)
+        settings_vault_map="$value"
+        ;;
     esac
   done < "$file"
 }
@@ -401,6 +410,7 @@ write_settings_file() {
 #   CODEX_MEMORY_DEFAULT_OVERRIDE=0|1
 #   CODEX_MEMORY_DEFAULT_REMOTELY_SAVE=0|1
 #   CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY=0|1
+#   CODEX_MEMORY_DEFAULT_VAULT_MAP=0|1
 
 CODEX_MEMORY_LANG=$(quote_setting_value "$settings_lang")
 CODEX_MEMORY_CLOUD_ROOT=$(quote_setting_value "$settings_cloud_root")
@@ -409,6 +419,7 @@ CODEX_MEMORY_PROJECT_NAME=$(quote_setting_value "$settings_project_name")
 CODEX_MEMORY_DEFAULT_OVERRIDE=$(quote_setting_value "$settings_override_agents")
 CODEX_MEMORY_DEFAULT_REMOTELY_SAVE=$(quote_setting_value "$settings_remotely_save")
 CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY=$(quote_setting_value "$settings_auto_write_memory")
+CODEX_MEMORY_DEFAULT_VAULT_MAP=$(quote_setting_value "$settings_vault_map")
 EOF
 
   created+=("settings file $file")
@@ -1196,6 +1207,8 @@ if (( ! auto_write_memory_cli_set )) && [[ -n "$settings_auto_write_memory" ]]; 
   auto_write_memory="$settings_auto_write_memory"
 fi
 
+vault_map_default="${settings_vault_map:-1}"
+
 case "$lang" in
   en|ru) ;;
   *)
@@ -1272,10 +1285,12 @@ fi
 
 if [[ -n "$obsidian_root" ]]; then
   vault_map_target="$TARGET_ROOT/map.md"
-  if [[ -e "$vault_map_target" ]]; then
-    skipped+=("map.md")
-  else
-    copy_template_file "$TEMPLATE_VAULT_MAP" "$vault_map_target" "map.md"
+  if [[ "$vault_map_default" != 0 ]]; then
+    if [[ -e "$vault_map_target" ]]; then
+      skipped+=("map.md")
+    else
+      copy_template_file "$TEMPLATE_VAULT_MAP" "$vault_map_target" "map.md"
+    fi
   fi
 fi
 

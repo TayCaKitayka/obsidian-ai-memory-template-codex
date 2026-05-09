@@ -102,6 +102,7 @@ codex-project --settings
 - `CODEX_MEMORY_PROJECT_NAME`
 - `CODEX_MEMORY_DEFAULT_REMOTELY_SAVE`
 - `CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY`
+- `CODEX_MEMORY_DEFAULT_VAULT_MAP`
 
 Также поддерживается локальный override-файл `./.codex-project.env`, но нормальный сценарий — именно глобальный файл.
 

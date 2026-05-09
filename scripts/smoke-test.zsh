@@ -98,16 +98,18 @@ settings_vault="$(mktemp -d "${TMP_ROOT}/settings-vault.XXXXXX")"
   export CODEX_MEMORY_OBSIDIAN_ROOT="$settings_vault"
   export CODEX_MEMORY_DEFAULT_REMOTELY_SAVE=1
   export CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY=0
+  export CODEX_MEMORY_DEFAULT_VAULT_MAP=1
   mkdir -p "$settings_dir"
   cd "$settings_dir"
   "$REPO_ROOT/bin/codex-project" --settings >/dev/null
   check_file "$XDG_CONFIG_HOME/codex-project/settings.env"
-  unset CODEX_MEMORY_LANG CODEX_MEMORY_OBSIDIAN_ROOT CODEX_MEMORY_DEFAULT_REMOTELY_SAVE CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY
+  unset CODEX_MEMORY_LANG CODEX_MEMORY_OBSIDIAN_ROOT CODEX_MEMORY_DEFAULT_REMOTELY_SAVE CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY CODEX_MEMORY_DEFAULT_VAULT_MAP
   "$REPO_ROOT/bin/codex-project" --init-only >/dev/null
   check_file "$settings_dir/AGENTS.md"
   check_file "$settings_dir/AI Memory/_index.md"
   check_file "$settings_dir/AI Memory/map.md"
   check_file "$settings_dir/AI Memory/remotely-save.md"
+  grep -Fq -- "CODEX_MEMORY_DEFAULT_VAULT_MAP" "$XDG_CONFIG_HOME/codex-project/settings.env"
   check_file "$settings_vault/settings/AI Memory/_index.md"
   check_file "$settings_vault/settings/AI Memory/map.md"
   check_file "$settings_vault/settings/AI Memory/remotely-save.md"
