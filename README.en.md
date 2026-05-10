@@ -160,6 +160,7 @@ When `--obsidian-root` is used, that top-level note is created in the vault root
 
 When AI generates code, create a short `.md` note beside it that captures the code's purpose, constraints, and notable implementation quirks.
 If you want that note automatically, run `codex-project code-note` in the project directory. Use `--title` to name the note and `--source` to place it beside a source file. `codex-project note` is a shorter alias.
+The note command also ensures a top-level `map.md` exists and adds a `[[map]]` link to the note.
 
 ## Obsidian Vault Workflow
 

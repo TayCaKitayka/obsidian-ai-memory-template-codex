@@ -202,6 +202,18 @@ quote_setting_value() {
   print -r -- "\"$value\""
 }
 
+ensure_vault_map_note() {
+  local vault_root="$1"
+  local template_path="$2"
+  local vault_map_target="$vault_root/map.md"
+
+  if [[ -e "$vault_map_target" ]]; then
+    return 0
+  fi
+
+  copy_template_file "$template_path" "$vault_map_target" "map.md"
+}
+
 wizard_prompt_text() {
   local prompt="$1"
   local default="$2"
@@ -1090,8 +1102,10 @@ if (( code_note_mode )); then
   [[ -n "$TEMPLATE_ROOT" ]] || die "template root not found. Set CODEX_MEMORY_TEMPLATE_ROOT to the repository root that contains templates/AI Memory/."
   if [[ "$lang" == "ru" ]]; then
     TEMPLATE_CODE_NOTE="$TEMPLATE_ROOT/locales/ru/templates/code-note.md"
+    TEMPLATE_VAULT_MAP="$TEMPLATE_ROOT/locales/ru/templates/vault-map.md"
   else
     TEMPLATE_CODE_NOTE="$TEMPLATE_ROOT/templates/code-note.md"
+    TEMPLATE_VAULT_MAP="$TEMPLATE_ROOT/templates/vault-map.md"
   fi
 
   if [[ -n "$code_note_source" && "$code_note_target" == "$TARGET_ROOT/code-note.md" ]]; then
@@ -1107,13 +1121,12 @@ if (( code_note_mode )); then
       sed "s/^# Code Note$/# $code_note_title/" "$code_note_target" > "$tmp_note" || die "failed to rewrite code note title"
       mv "$tmp_note" "$code_note_target"
     fi
-    if [[ -e "$TARGET_ROOT/map.md" ]]; then
-      {
-        print -r -- ""
-        print -r -- "## Vault"
-        print -r -- "- [[map]]"
-      } >> "$code_note_target"
-    fi
+    ensure_vault_map_note "$TARGET_ROOT" "$TEMPLATE_VAULT_MAP"
+    {
+      print -r -- ""
+      print -r -- "## Vault"
+      print -r -- "- [[map]]"
+    } >> "$code_note_target"
     if [[ -n "$code_note_source" ]]; then
       {
         print -r -- ""
@@ -1239,9 +1252,22 @@ if (( settings_mode )); then
     settings_cloud_root="$cloud_root"
     settings_obsidian_root="$obsidian_root"
     settings_project_name=""
-    settings_override_agents="$override_agents"
-    settings_remotely_save="$remotely_save"
-    settings_auto_write_memory="$auto_write_memory"
+    if (( override_agents_cli_set )); then
+      settings_override_agents="$override_agents"
+    else
+      settings_override_agents="${CODEX_MEMORY_DEFAULT_OVERRIDE:-$override_agents}"
+    fi
+    if (( remotely_save_cli_set )); then
+      settings_remotely_save="$remotely_save"
+    else
+      settings_remotely_save="${CODEX_MEMORY_DEFAULT_REMOTELY_SAVE:-$remotely_save}"
+    fi
+    if (( auto_write_memory_cli_set )); then
+      settings_auto_write_memory="$auto_write_memory"
+    else
+      settings_auto_write_memory="${CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY:-$auto_write_memory}"
+    fi
+    settings_vault_map="${CODEX_MEMORY_DEFAULT_VAULT_MAP:-1}"
   fi
   settings_file="$(resolve_settings_file "$settings_target")"
   write_settings_file "$settings_file"
@@ -1379,12 +1405,11 @@ fi
 
 if [[ -n "$obsidian_root" ]]; then
   vault_map_root="${obsidian_root:A}"
-  vault_map_target="$vault_map_root/map.md"
   if [[ "$vault_map_default" != 0 ]]; then
-    if [[ -e "$vault_map_target" ]]; then
+    if [[ -e "$vault_map_root/map.md" ]]; then
       skipped+=("map.md")
     else
-      copy_template_file "$TEMPLATE_VAULT_MAP" "$vault_map_target" "map.md"
+      ensure_vault_map_note "$vault_map_root" "$TEMPLATE_VAULT_MAP"
     fi
   fi
 fi
@@ -1404,6 +1429,9 @@ mkdir -p "$memory_copy_root"
 
 for src in "$TEMPLATE_MEMORY"/*.md(N); do
   name="${src:t}"
+  if [[ "$name" == "remotely-save.md" ]] && (( ! remotely_save )); then
+    continue
+  fi
   dest="$memory_copy_root/$name"
   label="AI Memory/$name"
   copy_template_file "$src" "$dest" "$label"

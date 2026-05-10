@@ -32,10 +32,19 @@ check_file() {
   }
 }
 
+check_absent() {
+  local file="$1"
+  [[ ! -e "$file" ]] || {
+    print -u2 -r -- "smoke-test: unexpected file: $file"
+    exit 1
+  }
+}
+
 check_gitignore() {
   local file="$1"
   grep -Fxq -- "/AI Memory/" "$file"
   grep -Fxq -- "/AI Memory/**" "$file"
+  grep -Fxq -- "/.codex-project.env" "$file"
   grep -Fxq -- "*.memory.local.md" "$file"
 }
 
@@ -60,6 +69,7 @@ init_dir="$(mktemp -d "${TMP_ROOT}/init.XXXXXX")"
   check_file "$init_dir/AGENTS.md"
   check_file "$init_dir/AI Memory/_index.md"
   check_file "$init_dir/AI Memory/map.md"
+  check_absent "$init_dir/AI Memory/remotely-save.md"
   check_gitignore "$init_dir/.gitignore"
   check_gitignored "$init_dir"
   check_file "$init_dir/.codex-project/AGENTS.md"
@@ -130,7 +140,11 @@ settings_vault="$(mktemp -d "${TMP_ROOT}/settings-vault.XXXXXX")"
   check_file "$settings_dir/AI Memory/_index.md"
   check_file "$settings_dir/AI Memory/map.md"
   check_file "$settings_dir/AI Memory/remotely-save.md"
+  check_file "$settings_dir/docs/remotely-save.md"
   grep -Fq -- "CODEX_MEMORY_DEFAULT_VAULT_MAP" "$XDG_CONFIG_HOME/codex-project/settings.env"
+  grep -Fq -- 'CODEX_MEMORY_DEFAULT_REMOTELY_SAVE="1"' "$XDG_CONFIG_HOME/codex-project/settings.env"
+  grep -Fq -- 'CODEX_MEMORY_DEFAULT_AUTO_WRITE_MEMORY="0"' "$XDG_CONFIG_HOME/codex-project/settings.env"
+  grep -Fq -- 'CODEX_MEMORY_DEFAULT_VAULT_MAP="1"' "$XDG_CONFIG_HOME/codex-project/settings.env"
   check_file "$settings_vault/map.md"
   check_file "$settings_vault/settings/AI Memory/_index.md"
   check_file "$settings_vault/settings/AI Memory/map.md"
@@ -179,8 +193,8 @@ code_note_dir="$(mktemp -d "${TMP_ROOT}/code-note.XXXXXX")"
   export HOME="$SANDBOX_HOME"
   export XDG_CONFIG_HOME="$HOME/.config"
   cd "$code_note_dir"
-  "$REPO_ROOT/bin/codex-project" vault-map >/dev/null
   "$REPO_ROOT/bin/codex-project" note --title "Smoke Note" >/dev/null
+  check_file "$code_note_dir/map.md"
   check_file "$code_note_dir/code-note.md"
   grep -Fq -- "# Smoke Note" "$code_note_dir/code-note.md"
   grep -Fq -- "[[map]]" "$code_note_dir/code-note.md"
