@@ -74,6 +74,8 @@ init_dir="$(mktemp -d "${TMP_ROOT}/init.XXXXXX")"
   check_gitignored "$init_dir"
   check_file "$init_dir/.codex-project/AGENTS.md"
   check_file "$init_dir/.codex-project/AI Memory/_index.md"
+  [[ "$(readlink "$init_dir/AGENTS.md")" == ".codex-project/AGENTS.md" ]]
+  [[ "$(readlink "$init_dir/AI Memory")" == ".codex-project/AI Memory" ]]
 )
 
 print -r -- "smoke-test: migrate"
@@ -90,6 +92,26 @@ migrate_dir="$(mktemp -d "${TMP_ROOT}/migrate.XXXXXX")"
   check_file "$migrate_dir/.codex-project/AI Memory/_index.md"
   [[ -L "$migrate_dir/AGENTS.md" ]]
   [[ -L "$migrate_dir/AI Memory" ]]
+)
+
+print -r -- "smoke-test: moved project"
+moved_parent="$(mktemp -d "${TMP_ROOT}/moved-parent.XXXXXX")"
+move_root="$(mktemp -d "${TMP_ROOT}/move-root.XXXXXX")"
+orig_dir="$move_root/project"
+(
+  export HOME="$SANDBOX_HOME"
+  export XDG_CONFIG_HOME="$HOME/.config"
+  mkdir -p "$orig_dir"
+  cd "$orig_dir"
+  "$REPO_ROOT/bin/codex-project" --init-only >/dev/null
+  cd "$move_root"
+  mv "$orig_dir" "$moved_parent/renamed-project"
+  cd "$moved_parent/renamed-project"
+  "$REPO_ROOT/bin/codex-project" --init-only >/dev/null
+  check_file "$moved_parent/renamed-project/.codex-project/AGENTS.md"
+  check_file "$moved_parent/renamed-project/.codex-project/AI Memory/_index.md"
+  [[ "$(readlink "$moved_parent/renamed-project/AGENTS.md")" == ".codex-project/AGENTS.md" ]]
+  [[ "$(readlink "$moved_parent/renamed-project/AI Memory")" == ".codex-project/AI Memory" ]]
 )
 
 print -r -- "smoke-test: doctor"
@@ -174,6 +196,8 @@ vault_dir="$(mktemp -d "${TMP_ROOT}/vault.XXXXXX")"
   check_file "$vault_dir/map.md"
   check_file "$vault_dir/obsidian-test/AI Memory/_index.md"
   check_file "$vault_dir/obsidian-test/AI Memory/map.md"
+  [[ "$(cd "$TMP_ROOT/AI Memory" && pwd -P)" == "$(cd "$vault_dir/obsidian-test/AI Memory" && pwd -P)" ]]
+  grep -Fq -- '[[obsidian-test/AI Memory/map|obsidian test AI Memory]] - memory entry point and [[obsidian-test/AI Memory/project-overview|project overview]]' "$vault_dir/map.md"
   check_gitignore "$TMP_ROOT/.gitignore"
 )
 

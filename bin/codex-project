@@ -444,6 +444,10 @@ copy_template_file() {
 
   [[ -f "$src" ]] || die "template file not found: $src"
 
+  if [[ -L "$dest" && ! -e "$dest" ]]; then
+    rm -f "$dest"
+  fi
+
   if [[ -e "$dest" ]]; then
     skipped+=("$label")
     return 0
@@ -457,17 +461,90 @@ copy_template_file() {
 ensure_symlink() {
   local target="$1"
   local link_path="$2"
+  local link_dir="${link_path:h}"
+  local abs_target=""
+  local desired_target=""
+  local current_target=""
+
+  link_dir="${link_dir:A}"
+  mkdir -p "${link_path:h}"
+  abs_target="${target:A}"
+
+  if [[ "$abs_target" == "$link_dir/"* ]]; then
+    desired_target="${abs_target#$link_dir/}"
+  else
+    desired_target="$abs_target"
+  fi
 
   if [[ -L "$link_path" ]]; then
+    current_target="$(readlink "$link_path")"
+    if [[ "$current_target" == "$desired_target" ]]; then
+      return 0
+    fi
+    rm -f "$link_path"
+  elif [[ -e "$link_path" ]]; then
     return 0
   fi
 
-  if [[ -e "$link_path" ]]; then
+  ln -s "$desired_target" "$link_path"
+}
+
+normalize_project_label() {
+  local raw="$1"
+  local label
+
+  label="${raw//-/ }"
+  label="${label//_/ }"
+  print -r -- "$label"
+}
+
+ensure_vault_project_entry() {
+  local vault_root="$1"
+  local entry_project="$2"
+  local mode_lang="${3:-en}"
+  local vault_map_target="$vault_root/map.md"
+  local project_label
+  local entry_line
+  local tmp
+  local updated=0
+
+  [[ -f "$vault_map_target" ]] || return 0
+
+  project_label="$(normalize_project_label "$entry_project")"
+  if [[ "$mode_lang" == "ru" ]]; then
+    entry_line="- [[${entry_project}/AI Memory/map|${project_label} AI Memory]] - точка входа в память и [[${entry_project}/AI Memory/project-overview|обзор проекта]]"
+  else
+    entry_line="- [[${entry_project}/AI Memory/map|${project_label} AI Memory]] - memory entry point and [[${entry_project}/AI Memory/project-overview|project overview]]"
+  fi
+
+  if grep -Fqx -- "$entry_line" "$vault_map_target"; then
     return 0
   fi
 
-  mkdir -p "${link_path:h}"
-  ln -s "$target" "$link_path"
+  tmp="$(mktemp "$vault_root/.codex-project-vault-map.XXXXXX")" || die "unable to create temporary file"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "- [[${entry_project}/AI Memory/map|"* ]] || [[ "$line" == "- [[${entry_project}/AI Memory/project-overview|"* ]]; then
+      continue
+    fi
+
+    print -r -- "$line" >> "$tmp"
+
+    if (( ! updated )) && [[ "$line" == "## Projects" ]]; then
+      print -r -- "$entry_line" >> "$tmp"
+      updated=1
+    fi
+  done < "$vault_map_target"
+
+  if (( ! updated )); then
+    {
+      print -r -- ""
+      print -r -- "## Projects"
+      print -r -- "$entry_line"
+    } >> "$tmp"
+  fi
+
+  mv "$tmp" "$vault_map_target"
+  created+=("map.md project entry")
 }
 
 migrate_legacy_layout() {
@@ -1385,14 +1462,21 @@ else
   memory_dir="$TARGET_ROOT/AI Memory"
 fi
 
-if [[ -n "$cloud_root" ]]; then
+  if [[ -n "$cloud_root" ]]; then
   cloud_root="${cloud_root:A}"
   cloud_memory="$cloud_root/$project_name/AI Memory"
   mkdir -p "$cloud_memory"
 
   if [[ -L "$memory_dir" ]]; then
     current_target="$(readlink "$memory_dir")"
-    skipped+=("AI Memory symlink -> $current_target")
+    expected_target="${cloud_memory:A}"
+    if [[ "$current_target" == "$expected_target" || "$current_target" == "$cloud_memory" ]]; then
+      skipped+=("AI Memory symlink -> $current_target")
+    else
+      rm -f "$memory_dir"
+      ln -s "$cloud_memory" "$memory_dir"
+      created+=("AI Memory -> $cloud_memory")
+    fi
   elif [[ -e "$memory_dir" ]]; then
     warnings+=("AI Memory already exists as a regular file or directory; not replacing it with a cloud symlink.")
     warnings+=("A non-destructive copy will be mirrored to: $cloud_memory")
@@ -1411,6 +1495,7 @@ if [[ -n "$obsidian_root" ]]; then
     else
       ensure_vault_map_note "$vault_map_root" "$TEMPLATE_VAULT_MAP"
     fi
+    ensure_vault_project_entry "$vault_map_root" "$project_name" "$lang"
   fi
 fi
 
